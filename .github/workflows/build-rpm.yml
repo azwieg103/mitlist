@@ -74,6 +74,13 @@ jobs:
           print(f"RPM release: {version}-{value}")
           PY
 
+      - name: Smoke-test command-line interface
+        run: |
+          make
+          ./mitlist --help
+          ./mitlist --version
+          make clean
+
       - name: Build RPM
         run: bash scripts/build-rpm.sh
         env:
