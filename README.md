@@ -49,7 +49,7 @@ Options and filters are case-insensitive. The optional positional pattern is equ
 
 mitlist uses the MIT Kerberos remote administration protocol to list principal names. It does **not** read the KDC database directly and does not add, modify, delete, or extract keys.
 
-**A normal user does not need an administrative principal such as `andrew/admin@REALM`.** The current implementation explicitly authenticates to kadmin as the exact principal stored in the user's default credential cache. The administrator can grant that ordinary principal only the `list` ACL permission.
+**A normal user does not need an administrative principal such as `andrew/admin@REALM`.** mitlist uses the default credential cache and reads the realm's `admin_server` setting from the active Kerberos configuration (`krb5.conf`, including configuration selected through `KRB5_CONFIG`). It passes that server to `kadmin` and lets MIT Kerberos use the credentials already in the cache; it does not force an `/admin` identity or prompt for a password. The administrator can grant the ordinary principal only the `list` ACL permission.
 
 MIT Kerberos does not provide a general unauthorised principal-enumeration operation. The supported way to allow this read-only listing is the `l` permission in `kadm5.acl`.
 
@@ -83,7 +83,7 @@ klist
 Then test the remote read-only operation using the user's ordinary principal (replace the realm/principal as appropriate):
 
 ```bash
-kadmin -p andrew@ZWIEGNET.COM -q list_principals
+kadmin -c "$KRB5CCNAME" -s cldap2.zwiegnet.com:749 -q list_principals
 ```
 
 If that succeeds, run:
@@ -94,7 +94,7 @@ mitlist -u
 mitlist -t HTTP
 ```
 
-mitlist uses the default credential cache, including KEYRING caches. It does not prompt for or store a password. The KDC's configured admin server and the appropriate `kadmin/admin` or `kadmin/ADMINHOST` service principal must be available, and network access to kadmind must be permitted.
+mitlist uses the default credential cache, including KEYRING caches, and obtains the admin server from the active Kerberos configuration for the default realm. It does not prompt for or store a password. The configured admin server's appropriate `kadmin/admin` or `kadmin/ADMINHOST` service principal must be available, and network access to kadmind must be permitted.
 
 If the command fails, check the exact principal shown by `klist`, the ACL entry and its position, the admin-server configuration, kadmind logs, and whether the KDC can issue the kadmin service ticket. A KDC policy rejection while requesting that service ticket is a separate issue from the ACL's `list` authorization; granting broader database privileges will not fix a service-ticket issuance failure.
 
