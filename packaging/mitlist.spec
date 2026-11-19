@@ -15,7 +15,7 @@ mitlist is a read-only command-line utility that lists MIT Kerberos
 principals, grouping user and common service principals.
 
 %prep
-%autosetup
+%autosetup -n %{name}
 
 %build
 %make_build
