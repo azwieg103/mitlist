@@ -293,7 +293,10 @@ static int show_info(void)
 
 static int execute_kadmin(const char *cache_name, const char *server, string_list *principals)
 {
-    int attempt;
+    int pipefd[2], status;
+    pid_t child;
+    FILE *stream;
+    char line[MAX_LINE];
     if (pipe(pipefd) < 0) { perror(PROGRAM ": pipe"); return -1; }
     child = fork();
     if (child < 0) { perror(PROGRAM ": fork"); close(pipefd[0]); close(pipefd[1]); return -1; }
@@ -335,10 +338,7 @@ static int run_kadmin(string_list *principals)
     const char *cache_name;
     krb5_error_code code;
     long profile_code;
-    int pipefd[2], status;
-    pid_t child;
-    FILE *stream;
-    char line[MAX_LINE];
+    int attempt;
 
     if (krb5_init_context(&context) != 0) {
         fprintf(stderr, PROGRAM ": cannot initialize Kerberos library\n");
