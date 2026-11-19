@@ -4,6 +4,14 @@
 
 The project is hosted at [github.com/azwieg103/mitlist](https://github.com/azwieg103/mitlist).
 
+> [!IMPORTANT]
+> **KDC ACL CONFIGURATION IS REQUIRED.** The ordinary user principal that runs mitlist must be granted the lowercase **l (list) permission** in the KDC's kadm5.acl file. For example:
+>
+> ```text
+> alice@YOURDOMAIN.COM    l
+> ```
+>
+> Add this on the KDC (not the client), then restart kadmind. Without this ACL entry, mitlist cannot list principals, even when the user has a valid Kerberos ticket. This grants realm-wide name listing only; it does not grant principal or key administration rights. See [Kerberos access: read-only users](#kerberos-access-read-only-users) for exact setup and security scope.
 ## What it lists
 
 | Group | Principal form |
@@ -38,12 +46,15 @@ mitlist -f 'www*'
 # Restrict to a realm
 mitlist -r EXAMPLE.COM
 
+# Show realm and configured KDC/admin servers
+mitlist --info
+
 # Help and version
 mitlist --help
 mitlist --version
 ```
 
-Options and filters are case-insensitive. The optional positional pattern is equivalent to `--filter`; matching uses case-insensitive shell-style wildcards.
+Options and filters are case-insensitive. The optional positional pattern is equivalent to `--filter`; matching uses case-insensitive shell-style wildcards. `--info` displays the default realm plus explicitly configured KDC and admin-server entries. When KDCs are not explicitly listed, MIT Kerberos may use DNS SRV discovery depending on `dns_lookup_kdc`.
 
 ## Kerberos access: read-only users
 
@@ -103,7 +114,7 @@ If the command fails, check the exact principal shown by `klist`, the ACL entry 
 - MIT Kerberos V5 client utilities (including `kadmin`)
 - A configured Kerberos realm and reachable administration server
 - A valid Kerberos credential cache
-- The authenticated principal's `list` ACL permission on the KDC
+- The authenticated principal's `list` ACL permission on the KDC (required; see the prominent warning above)
 
 ## Build and installation
 
@@ -124,7 +135,7 @@ On AlmaLinux 10, install `gcc`, `make`, `krb5-devel`, `krb5-workstation`, and `r
 bash scripts/build-rpm.sh
 ```
 
-The RPMs are written to `dist/`. GitHub Actions builds and publishes RPM and source RPM assets automatically when relevant files change on `main`.
+The RPMs are written to `dist/`. The package installs the `mitlist(1)` manual page under the standard man-page directory. GitHub Actions builds and publishes RPM and source RPM assets automatically when relevant files change on `main`.
 
 ## Project goals
 
