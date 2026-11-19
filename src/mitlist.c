@@ -23,7 +23,8 @@
 typedef struct { const char *name; const char *service; } category;
 static const category categories[] = {
     {"Users", NULL}, {"HTTP", "http"}, {"CIFS", "cifs"}, {"Host", "host"},
-    {"IMAP", "imap"}, {"SMTP", "smtp"}, {"LDAP", "ldap"}, {"NFS", "nfs"}
+    {"IMAP", "imap"}, {"SMTP", "smtp"}, {"LDAP", "ldap"}, {"NFS", "nfs"},
+    {"MySQL", "mysql"}, {"PostgreSQL", "postgres"}
 };
 #define CATEGORY_COUNT (sizeof(categories) / sizeof(categories[0]))
 
@@ -36,7 +37,7 @@ static void usage(FILE *out)
         "List MIT Kerberos principals using the current Kerberos credential cache.\n\n"
         "Options:\n"
         "  -u, --users             List user principals only\n"
-        "  -t, --type TYPE         List one type (users, HTTP, cifs, host, imap, smtp, ldap, nfs)\n"
+        "  -t, --type TYPE         List one type (users, HTTP, cifs, host, imap, smtp, ldap, nfs, mysql, postgres)\n"
         "  -f, --filter PATTERN    Case-insensitive shell-style principal filter\n"
         "  -r, --realm REALM       Restrict results to REALM\n"
         "  -i, --info              Show default realm and configured Kerberos servers\n"
