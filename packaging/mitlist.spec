@@ -30,7 +30,7 @@ rm -rf %{buildroot}
 
 %changelog
 * Thu Nov 19 2026 Andrew Zwieg <andyzwieg@gmail.com> - 0.1.5-ZWIEGNET.1.el10
-- Display live Kerberos DNS SRV records and refresh a rejected admin service ticket once.
+- Display live Kerberos DNS SRV records, refresh a rejected admin service ticket once, and group MySQL/PostgreSQL principals separately.
 
 * Thu Nov 19 2026 Andrew Zwieg <andyzwieg@gmail.com> - 0.1.4-ZWIEGNET.2.el10
 - Add --info server discovery output, clean command output, and install the man page.
