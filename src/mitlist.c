@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -260,7 +261,7 @@ int main(int argc, char **argv)
     };
 
     while ((option = getopt_long(argc, argv, "uUt:T:f:F:r:R:hH", options, NULL)) != -1) {
-        switch (tolower((unsigned char)option)) {
+        switch (option == 1000 ? 1000 : tolower((unsigned char)option)) {
         case 'u': users_only = 1; break;
         case 't': type = optarg; break;
         case 'f': filter = optarg; break;
