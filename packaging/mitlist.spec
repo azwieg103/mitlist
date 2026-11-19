@@ -1,5 +1,5 @@
 Name:           mitlist
-Version:        0.1.4
+Version:        0.1.5
 Release:        %{?rpm_release}%{!?rpm_release:ZWIEGNET.1.el10}
 Summary:        List MIT Kerberos principals by principal type
 License:        MIT
@@ -29,6 +29,9 @@ rm -rf %{buildroot}
 %{_mandir}/man1/mitlist.1*
 
 %changelog
+* Thu Nov 19 2026 Andrew Zwieg <andyzwieg@gmail.com> - 0.1.5-ZWIEGNET.1.el10
+- Display live Kerberos DNS SRV records and refresh a rejected admin service ticket once.
+
 * Thu Nov 19 2026 Andrew Zwieg <andyzwieg@gmail.com> - 0.1.4-ZWIEGNET.2.el10
 - Add --info server discovery output, clean command output, and install the man page.
 
