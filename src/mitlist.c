@@ -119,9 +119,9 @@ static int run_kadmin(string_list *principals)
         code = krb5_cc_resolve(context, cache_name, &cache);
         if (code == 0) code = krb5_cc_get_principal(context, cache, &client);
         if (code == 0) {
-            krb5_data realm = krb5_princ_realm(context, client);
-            code = krb5_build_principal(context, &server, realm.length,
-                                        realm.data, "kadmin", "admin", NULL);
+            krb5_data *realm = krb5_princ_realm(context, client);
+            code = krb5_build_principal(context, &server, realm->length,
+                                        realm->data, "kadmin", "admin", NULL);
         }
         if (code == 0) {
             request.client = client;
