@@ -367,7 +367,7 @@ static int run_kadmin(string_list *principals)
     while (fgets(line, sizeof(line), stream)) {
         size_t n = strcspn(line, "\r\n");
         line[n] = '\0';
-        if (n == 0 || !strchr(line, '@')) continue;
+        if (n == 0 || !strchr(line, '@') || strpbrk(line, " \t") != NULL) continue;
         if (list_add(principals, line) < 0) {
             fprintf(stderr, PROGRAM ": out of memory\n");
             fclose(stream);
