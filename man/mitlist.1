@@ -1,4 +1,4 @@
-.TH MITLIST 1 "November 2026" "mitlist 0.1.4" "User Commands"
+.TH MITLIST 1 "November 2026" "mitlist 0.1.5" "User Commands"
 .SH NAME
 mitlist \- list MIT Kerberos principals by principal type
 .SH SYNOPSIS
@@ -69,10 +69,7 @@ Only display principals belonging to REALM. The realm comparison is case-insensi
 This option filters the returned list; the admin server and default credentials are still selected from the active Kerberos configuration and credential cache.
 .TP
 .BR -i ", " --info
-Display the default realm and KDC/admin-server entries explicitly configured for that realm, then exit.
-If no KDC is explicitly listed, MIT Kerberos may discover KDCs through DNS according to
-.B dns_lookup_kdc
-and DNS SRV records. This command reports configuration entries; it does not perform a live KDC discovery or connectivity test.
+Display the default realm, configured KDC/admin-server entries, and live DNS SRV records for KDC, master KDC, admin, and password services. Each result includes target, port, priority, and weight. DNS answers are shown regardless of dns_lookup_kdc; the command does not test server connectivity.
 .TP
 .BR -h ", " --help
 Display usage information and exit.
@@ -93,11 +90,11 @@ setting in the active
 .BR krb5.conf .
 The
 .B --info
-option shows the default realm and any explicitly configured
+option shows the default realm, explicitly configured
 .B kdc
 and
 .B admin_server
-values.
+values, and live DNS SRV answers.
 Multiple KDC entries can be configured for a realm.
 If explicit KDC entries are absent, MIT Kerberos can use DNS-based KDC discovery when enabled.
 .PP
