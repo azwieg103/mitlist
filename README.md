@@ -4,7 +4,7 @@
 
 The project is hosted at [github.com/azwieg103/mitlist](https://github.com/azwieg103/mitlist).
 
-> **Development status:** This README describes the intended interface and package policy. The mitlist implementation and automated release workflows are not yet present.
+> **Development status:** Initial C implementation and AlmaLinux 10 RPM automation are now in place. The first CI build is still required to validate the package end to end.
 
 ## What it lists
 
@@ -52,13 +52,25 @@ mitlist -h kadmin.example.com
 mitlist --help
 ```
 
-The final option set will be documented with the implementation. The examples above describe the planned interface and should not be considered available until the corresponding features are implemented.
+The initial implementation supports these options (option names and values are case-insensitive):
+
+```bash
+mitlist -U
+mitlist -T HTTP
+mitlist -t http
+mitlist -F 'HTTP/*'
+mitlist -f 'http/*'
+mitlist -R ZWIEGNET.COM
+mitlist --TYPE cIfS
+```
+
+The optional positional pattern is equivalent to `--filter`. Matching uses case-insensitive shell-style wildcards.
 
 ## Kerberos access
 
 mitlist is intended to use the MIT Kerberos `kadmin` interface to retrieve principal names. It will not read the Kerberos database directly and will not create, modify, or delete principals.
 
-The normal remote-administration authentication mechanisms supported by MIT Kerberos should be used, including an existing Kerberos credential cache or keytab-based authentication where configured. No password should be stored in mitlist configuration or passed on the command line.
+mitlist uses the current process's default Kerberos credential cache (including KEYRING caches such as `KEYRING:persistent:UID:...`). It uses the existing TGT to obtain a `kadmin/admin` service ticket and stores that service ticket in the same cache before invoking `kadmin -c`. It does not prompt for, store, or pass a password. The authenticated principal must be authorized by the Kerberos administrative ACL.
 
 The Kerberos administrative ACL must grant the authenticated identity the `list` privilege. mitlist is a listing tool; it does not need principal modification privileges.
 
@@ -81,7 +93,13 @@ The primary packaging target is **AlmaLinux 10 x86_64**. The project will use th
 
 Windows builds are the next priority after the AlmaLinux 10 package. Additional Enterprise Linux and other supported platforms can follow once the primary builds are reliable.
 
-When implemented, local RPM build instructions and package names will be documented here.
+On AlmaLinux 10, install `gcc`, `make`, `krb5-devel`, `krb5-workstation`, and `rpm-build`, then run:
+
+```bash
+bash scripts/build-rpm.sh
+```
+
+The RPMs are written to `dist/`. GitHub Actions builds and publishes RPM and source RPM assets automatically when source or packaging files change on `main`.
 
 ## Project goals
 
