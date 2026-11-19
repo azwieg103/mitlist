@@ -1,0 +1,5 @@
+/mitlist
+/dist/
+/work/
+/rpmbuild/
+*.o
