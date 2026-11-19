@@ -14,27 +14,17 @@
 #include <unistd.h>
 
 #define MITLIST_VERSION "0.1.0"
-
 #define PROGRAM "mitlist"
 #define MAX_LINE 8192
 
-typedef struct {
-    const char *name;
-    const char *service;
-} category;
-
+typedef struct { const char *name; const char *service; } category;
 static const category categories[] = {
-    {"Users", NULL}, {"HTTP", "http"}, {"CIFS", "cifs"},
-    {"Host", "host"}, {"IMAP", "imap"}, {"SMTP", "smtp"},
-    {"LDAP", "ldap"}, {"NFS", "nfs"}
+    {"Users", NULL}, {"HTTP", "http"}, {"CIFS", "cifs"}, {"Host", "host"},
+    {"IMAP", "imap"}, {"SMTP", "smtp"}, {"LDAP", "ldap"}, {"NFS", "nfs"}
 };
 #define CATEGORY_COUNT (sizeof(categories) / sizeof(categories[0]))
 
-typedef struct {
-    char **items;
-    size_t count;
-    size_t capacity;
-} string_list;
+typedef struct { char **items; size_t count; size_t capacity; } string_list;
 
 static void usage(FILE *out)
 {
@@ -58,8 +48,7 @@ static char *lower_copy(const char *s)
     size_t n = strlen(s);
     char *p = malloc(n + 1);
     if (!p) return NULL;
-    for (size_t i = 0; i < n; ++i)
-        p[i] = (char)tolower((unsigned char)s[i]);
+    for (size_t i = 0; i < n; ++i) p[i] = (char)tolower((unsigned char)s[i]);
     p[n] = '\0';
     return p;
 }
@@ -93,7 +82,11 @@ static int compare_strings(const void *a, const void *b)
 static int run_kadmin(string_list *principals)
 {
     krb5_context context = NULL;
+    krb5_ccache cache = NULL;
+    krb5_principal client = NULL;
+    char *client_name = NULL;
     const char *cache_name;
+    krb5_error_code code;
     int pipefd[2], status;
     pid_t child;
     FILE *stream;
@@ -111,12 +104,28 @@ static int run_kadmin(string_list *principals)
     }
 
     /*
-     * Do not pre-fetch kadmin/admin here. Some realms restrict that service
-     * principal. Let kadmin use the configured admin_server and acquire the
-     * appropriate kadmin/admin or kadmin/<admin-host> ticket itself.
+     * Explicitly authenticate as the exact principal in the default cache.
+     * Without -p, kadmin normally derives an /admin identity from the user
+     * name, which is inappropriate for a deliberately read-only user ACL.
      */
+    code = krb5_cc_resolve(context, cache_name, &cache);
+    if (code == 0) code = krb5_cc_get_principal(context, cache, &client);
+    if (code == 0) code = krb5_unparse_name(context, client, &client_name);
+    if (cache) krb5_cc_close(context, cache);
+    if (code != 0) {
+        const char *message = krb5_get_error_message(context, code);
+        fprintf(stderr, PROGRAM ": cannot identify the principal in the default ticket cache: %s\n",
+                message ? message : "Kerberos error");
+        if (message) krb5_free_error_message(context, message);
+        if (client) krb5_free_principal(context, client);
+        krb5_free_context(context);
+        return -1;
+    }
+    krb5_free_principal(context, client);
+
     if (pipe(pipefd) < 0) {
         perror(PROGRAM ": pipe");
+        krb5_free_unparsed_name(context, client_name);
         krb5_free_context(context);
         return -1;
     }
@@ -125,6 +134,7 @@ static int run_kadmin(string_list *principals)
     if (child < 0) {
         perror(PROGRAM ": fork");
         close(pipefd[0]); close(pipefd[1]);
+        krb5_free_unparsed_name(context, client_name);
         krb5_free_context(context);
         return -1;
     }
@@ -132,11 +142,12 @@ static int run_kadmin(string_list *principals)
         close(pipefd[0]);
         if (dup2(pipefd[1], STDOUT_FILENO) < 0) _exit(126);
         close(pipefd[1]);
-        execlp("kadmin", "kadmin", "-c", cache_name, "-q",
-               "list_principals", (char *)NULL);
+        execlp("kadmin", "kadmin", "-c", cache_name, "-p", client_name,
+               "-q", "list_principals", (char *)NULL);
         fprintf(stderr, PROGRAM ": cannot execute kadmin: %s\n", strerror(errno));
         _exit(127);
     }
+    krb5_free_unparsed_name(context, client_name);
 
     close(pipefd[1]);
     stream = fdopen(pipefd[0], "r");
@@ -151,9 +162,7 @@ static int run_kadmin(string_list *principals)
     while (fgets(line, sizeof(line), stream)) {
         size_t n = strcspn(line, "\r\n");
         line[n] = '\0';
-        if (n == 0) continue;
-        /* kadmin may print a prompt or diagnostics; accept principal-shaped lines only. */
-        if (!strchr(line, '@')) continue;
+        if (n == 0 || !strchr(line, '@')) continue;
         if (list_add(principals, line) < 0) {
             fprintf(stderr, PROGRAM ": out of memory\n");
             fclose(stream);
@@ -170,9 +179,8 @@ static int run_kadmin(string_list *principals)
     }
     krb5_free_context(context);
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-        fprintf(stderr, PROGRAM ": kadmin failed. Check that the current ticket cache "
-                "can authenticate to kadmind and that its principal has the Kerberos "
-                "'list' privilege.\n");
+        fprintf(stderr, PROGRAM ": kadmin failed. Confirm kadmind access and the "
+                "Kerberos 'list' ACL for the cache's exact principal.\n");
         return -1;
     }
     return 0;
@@ -183,23 +191,18 @@ static int principal_category(const char *principal)
     const char *slash = strchr(principal, '/');
     if (!slash) return 0;
     size_t service_len = (size_t)(slash - principal);
-    for (size_t i = 1; i < CATEGORY_COUNT; ++i) {
+    for (size_t i = 1; i < CATEGORY_COUNT; ++i)
         if (strlen(categories[i].service) == service_len &&
             strncasecmp(principal, categories[i].service, service_len) == 0)
             return (int)i;
-    }
     return (int)CATEGORY_COUNT;
 }
 
 static int matches_filter(const char *principal, const char *pattern)
 {
-    char *p = lower_copy(principal);
-    char *f = lower_copy(pattern);
+    char *p = lower_copy(principal), *f = lower_copy(pattern);
     int result;
-    if (!p || !f) {
-        free(p); free(f);
-        return 0;
-    }
+    if (!p || !f) { free(p); free(f); return 0; }
     result = fnmatch(f, p, 0) == 0;
     free(p); free(f);
     return result;
@@ -217,18 +220,12 @@ int main(int argc, char **argv)
     const char *type = NULL, *filter = NULL, *realm = NULL;
     int users_only = 0, selected = -1, option, rc = EXIT_FAILURE;
     static const struct option options[] = {
-        {"users", no_argument, NULL, 'u'},
-        {"USERS", no_argument, NULL, 'u'},
-        {"type", required_argument, NULL, 't'},
-        {"TYPE", required_argument, NULL, 't'},
-        {"filter", required_argument, NULL, 'f'},
-        {"FILTER", required_argument, NULL, 'f'},
-        {"realm", required_argument, NULL, 'r'},
-        {"REALM", required_argument, NULL, 'r'},
-        {"help", no_argument, NULL, 'h'},
-        {"HELP", no_argument, NULL, 'h'},
-        {"version", no_argument, NULL, 1000},
-        {NULL, 0, NULL, 0}
+        {"users", no_argument, NULL, 'u'}, {"USERS", no_argument, NULL, 'u'},
+        {"type", required_argument, NULL, 't'}, {"TYPE", required_argument, NULL, 't'},
+        {"filter", required_argument, NULL, 'f'}, {"FILTER", required_argument, NULL, 'f'},
+        {"realm", required_argument, NULL, 'r'}, {"REALM", required_argument, NULL, 'r'},
+        {"help", no_argument, NULL, 'h'}, {"HELP", no_argument, NULL, 'h'},
+        {"version", no_argument, NULL, 1000}, {NULL, 0, NULL, 0}
     };
 
     while ((option = getopt_long(argc, argv, "uUt:T:f:F:r:R:hH", options, NULL)) != -1) {
@@ -238,30 +235,21 @@ int main(int argc, char **argv)
         case 'f': filter = optarg; break;
         case 'r': realm = optarg; break;
         case 'h': usage(stdout); return EXIT_SUCCESS;
-        case 1000: puts(PROGRAM " 0.1.0"); return EXIT_SUCCESS;
+        case 1000: puts(PROGRAM " " MITLIST_VERSION); return EXIT_SUCCESS;
         default: usage(stderr); return EXIT_FAILURE;
         }
     }
     if (optind < argc) {
-        if (filter) {
-            fprintf(stderr, PROGRAM ": specify a filter only once\n");
-            return EXIT_FAILURE;
-        }
+        if (filter) { fprintf(stderr, PROGRAM ": specify a filter only once\n"); return EXIT_FAILURE; }
         filter = argv[optind++];
     }
-    if (optind != argc || (users_only && type)) {
-        usage(stderr);
-        return EXIT_FAILURE;
-    }
+    if (optind != argc || (users_only && type)) { usage(stderr); return EXIT_FAILURE; }
     if (type) {
         char *normalized = lower_copy(type);
         if (!normalized) return EXIT_FAILURE;
-        if (!strcmp(normalized, "user") || !strcmp(normalized, "users"))
-            selected = 0;
-        else {
-            for (size_t i = 1; i < CATEGORY_COUNT; ++i)
-                if (!strcmp(normalized, categories[i].service)) selected = (int)i;
-        }
+        if (!strcmp(normalized, "user") || !strcmp(normalized, "users")) selected = 0;
+        else for (size_t i = 1; i < CATEGORY_COUNT; ++i)
+            if (!strcmp(normalized, categories[i].service)) selected = (int)i;
         free(normalized);
         if (selected < 0) {
             fprintf(stderr, PROGRAM ": unknown principal type: %s\n", type);
@@ -271,24 +259,20 @@ int main(int argc, char **argv)
 
     if (run_kadmin(&principals) < 0) goto done;
     qsort(principals.items, principals.count, sizeof(*principals.items), compare_strings);
-
     for (size_t group = 0; group <= CATEGORY_COUNT; ++group) {
         size_t printed = 0;
         if (selected >= 0 && (size_t)selected != group) continue;
         for (size_t i = 0; i < principals.count; ++i) {
-            int category = principal_category(principals.items[i]);
-            if ((size_t)category != group) continue;
+            if ((size_t)principal_category(principals.items[i]) != group) continue;
             if (!matches_realm(principals.items[i], realm)) continue;
             if (filter && !matches_filter(principals.items[i], filter)) continue;
-            if (!printed) printf("%s\n", group < CATEGORY_COUNT ?
-                                  categories[group].name : "Other");
+            if (!printed) printf("%s\n", group < CATEGORY_COUNT ? categories[group].name : "Other");
             printf("%s\n", principals.items[i]);
             printed++;
         }
         if (printed) putchar('\n');
     }
     rc = EXIT_SUCCESS;
-
 done:
     list_free(&principals);
     return rc;
