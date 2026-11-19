@@ -5,6 +5,8 @@
 #include <fnmatch.h>
 #include <getopt.h>
 #include <krb5.h>
+#include <arpa/nameser.h>
+#include <resolv.h>
 #include <profile.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,7 +16,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define MITLIST_VERSION "0.1.4"
+#define MITLIST_VERSION "0.1.5"
 #define PROGRAM "mitlist"
 #define MAX_LINE 8192
 
@@ -206,6 +208,44 @@ static void print_profile_values(profile_t profile, const char *realm, const cha
     if (values) profile_free_list(values);
 }
 
+static void print_dns_discovery(const char *realm)
+{
+    char query[1024];
+    const char *services[][3] = {
+        {"_kerberos._udp", "KDC UDP", NULL},
+        {"_kerberos._tcp", "KDC TCP", NULL},
+        {"_kerberos-master._udp", "Master KDC UDP", NULL},
+        {"_kerberos-master._tcp", "Master KDC TCP", NULL},
+        {"_kerberos-adm._tcp", "Admin TCP", NULL},
+        {"_kpasswd._udp", "Password UDP", NULL},
+        {"_kpasswd._tcp", "Password TCP", NULL}
+    };
+    puts("DNS SRV records:");
+    for (size_t j = 0; j < sizeof(services) / sizeof(services[0]); ++j) {
+        unsigned char answer[NS_PACKETSZ * 8];
+        ns_msg msg;
+        ns_rr rr;
+        unsigned int found = 0;
+        int len;
+        snprintf(query, sizeof(query), "%s.%s", services[j][0], realm);
+        len = res_query(query, ns_c_in, ns_t_srv, answer, sizeof(answer));
+        if (len < 0 || ns_initparse(answer, len, &msg) < 0) {
+            printf("  %s (%s): no SRV records found\n", services[j][1], query);
+            continue;
+        }
+        for (int i = 0; i < ns_msg_count(msg, ns_s_an); ++i) {
+            char target[NS_MAXDNAME];
+            const unsigned char *data;
+            if (ns_parserr(&msg, ns_s_an, i, &rr) < 0 || ns_rr_type(rr) != ns_t_srv || ns_rr_rdlen(rr) < 7) continue;
+            data = ns_rr_rdata(rr);
+            if (dn_expand(answer, answer + len, data + 6, target, sizeof(target)) < 0) continue;
+            printf("  %s: %s:%u (priority %u, weight %u)\n", services[j][1], target, ns_get16(data + 4), ns_get16(data), ns_get16(data + 2));
+            found++;
+        }
+        if (!found) printf("  %s (%s): no usable SRV records\n", services[j][1], query);
+    }
+}
+
 static int show_info(void)
 {
     krb5_context context = NULL;
@@ -236,8 +276,9 @@ static int show_info(void)
     }
     print_profile_values(profile, realm, "kdc", "KDC");
     print_profile_values(profile, realm, "admin_server", "Admin server");
-    puts("Note: if no KDC is explicitly listed, MIT Kerberos may use DNS discovery");
-    puts("      according to dns_lookup_kdc and the realm's DNS SRV records.");
+    print_dns_discovery(realm);
+    puts("Note: DNS answers are shown regardless of dns_lookup_kdc; actual");
+    puts("      Kerberos discovery behavior also depends on realm configuration.");
     profile_release(profile);
     krb5_free_default_realm(context, realm);
     krb5_free_context(context);
