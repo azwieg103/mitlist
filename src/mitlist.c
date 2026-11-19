@@ -104,7 +104,7 @@ static int run_kadmin(string_list *principals)
     }
     cache_name = krb5_cc_default_name(context);
     if (!cache_name || !*cache_name) {
-        fprintf(stderr, PROGRAM ": no default Kerberos credential cache is configured\\n");
+        fprintf(stderr, PROGRAM ": no default Kerberos credential cache is configured\n");
         krb5_free_context(context);
         return -1;
     }
@@ -135,7 +135,7 @@ static int run_kadmin(string_list *principals)
         if (cache) krb5_cc_close(context, cache);
         if (code != 0) {
             const char *message = krb5_get_error_message(context, code);
-            fprintf(stderr, PROGRAM ": cannot obtain kadmin/admin using the current ticket cache: %s\\n",
+            fprintf(stderr, PROGRAM ": cannot obtain kadmin/admin using the current ticket cache: %s\n",
                     message ? message : "Kerberos error");
             if (message) krb5_free_error_message(context, message);
             krb5_free_context(context);
