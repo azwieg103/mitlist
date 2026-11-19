@@ -5,6 +5,7 @@
 #include <fnmatch.h>
 #include <getopt.h>
 #include <krb5.h>
+#include <profile.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,7 +14,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define MITLIST_VERSION "0.1.0"
+#define MITLIST_VERSION "0.1.1"
 #define PROGRAM "mitlist"
 #define MAX_LINE 8192
 
@@ -82,11 +83,12 @@ static int compare_strings(const void *a, const void *b)
 static int run_kadmin(string_list *principals)
 {
     krb5_context context = NULL;
-    krb5_ccache cache = NULL;
-    krb5_principal client = NULL;
-    char *client_name = NULL;
+    profile_t profile = NULL;
+    char *realm = NULL;
+    char *admin_server = NULL;
     const char *cache_name;
     krb5_error_code code;
+    long profile_code;
     int pipefd[2], status;
     pid_t child;
     FILE *stream;
@@ -96,6 +98,7 @@ static int run_kadmin(string_list *principals)
         fprintf(stderr, PROGRAM ": cannot initialize Kerberos library\n");
         return -1;
     }
+
     cache_name = krb5_cc_default_name(context);
     if (!cache_name || !*cache_name) {
         fprintf(stderr, PROGRAM ": no default Kerberos credential cache is configured\n");
@@ -103,29 +106,40 @@ static int run_kadmin(string_list *principals)
         return -1;
     }
 
-    /*
-     * Explicitly authenticate as the exact principal in the default cache.
-     * Without -p, kadmin normally derives an /admin identity from the user
-     * name, which is inappropriate for a deliberately read-only user ACL.
-     */
-    code = krb5_cc_resolve(context, cache_name, &cache);
-    if (code == 0) code = krb5_cc_get_principal(context, cache, &client);
-    if (code == 0) code = krb5_unparse_name(context, client, &client_name);
-    if (cache) krb5_cc_close(context, cache);
+    code = krb5_get_default_realm(context, &realm);
     if (code != 0) {
         const char *message = krb5_get_error_message(context, code);
-        fprintf(stderr, PROGRAM ": cannot identify the principal in the default ticket cache: %s\n",
+        fprintf(stderr, PROGRAM ": cannot determine the default Kerberos realm: %s\n",
                 message ? message : "Kerberos error");
         if (message) krb5_free_error_message(context, message);
-        if (client) krb5_free_principal(context, client);
         krb5_free_context(context);
         return -1;
     }
-    krb5_free_principal(context, client);
+
+    code = krb5_get_profile(context, &profile);
+    if (code == 0) {
+        profile_code = profile_get_string(profile, "realms", realm,
+                                          "admin_server", NULL, &admin_server);
+    } else {
+        profile_code = code;
+    }
+    if (profile_code != 0 || !admin_server || !*admin_server) {
+        fprintf(stderr, PROGRAM
+                ": no admin_server is configured for realm %s in the active Kerberos configuration\n",
+                realm);
+        if (admin_server) profile_release_string(admin_server);
+        if (profile) profile_release(profile);
+        krb5_free_default_realm(context, realm);
+        krb5_free_context(context);
+        return -1;
+    }
+
+    if (profile) profile_release(profile);
+    krb5_free_default_realm(context, realm);
 
     if (pipe(pipefd) < 0) {
         perror(PROGRAM ": pipe");
-        krb5_free_unparsed_name(context, client_name);
+        profile_release_string(admin_server);
         krb5_free_context(context);
         return -1;
     }
@@ -134,7 +148,7 @@ static int run_kadmin(string_list *principals)
     if (child < 0) {
         perror(PROGRAM ": fork");
         close(pipefd[0]); close(pipefd[1]);
-        krb5_free_unparsed_name(context, client_name);
+        profile_release_string(admin_server);
         krb5_free_context(context);
         return -1;
     }
@@ -142,12 +156,12 @@ static int run_kadmin(string_list *principals)
         close(pipefd[0]);
         if (dup2(pipefd[1], STDOUT_FILENO) < 0) _exit(126);
         close(pipefd[1]);
-        execlp("kadmin", "kadmin", "-c", cache_name, "-p", client_name,
+        execlp("kadmin", "kadmin", "-c", cache_name, "-s", admin_server,
                "-q", "list_principals", (char *)NULL);
         fprintf(stderr, PROGRAM ": cannot execute kadmin: %s\n", strerror(errno));
         _exit(127);
     }
-    krb5_free_unparsed_name(context, client_name);
+    profile_release_string(admin_server);
 
     close(pipefd[1]);
     stream = fdopen(pipefd[0], "r");
@@ -179,8 +193,8 @@ static int run_kadmin(string_list *principals)
     }
     krb5_free_context(context);
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-        fprintf(stderr, PROGRAM ": kadmin failed. Confirm kadmind access and the "
-                "Kerberos 'list' ACL for the cache's exact principal.\n");
+        fprintf(stderr, PROGRAM ": kadmin failed. Confirm kadmind access, the "
+                "Kerberos 'list' ACL, and the realm's admin_server configuration.\n");
         return -1;
     }
     return 0;
