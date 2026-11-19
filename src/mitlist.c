@@ -16,15 +16,31 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define MITLIST_VERSION "0.1.5"
+#define MITLIST_VERSION "0.1.6"
 #define PROGRAM "mitlist"
 #define MAX_LINE 8192
 
 typedef struct { const char *name; const char *service; } category;
 static const category categories[] = {
-    {"Users", NULL}, {"HTTP", "http"}, {"CIFS", "cifs"}, {"Host", "host"},
+    {"Users", NULL},
+    {"HTTP", "http"}, {"CIFS", "cifs"}, {"Host", "host"},
     {"IMAP", "imap"}, {"SMTP", "smtp"}, {"LDAP", "ldap"}, {"NFS", "nfs"},
-    {"MySQL", "mysql"}, {"PostgreSQL", "postgres"}
+    {"MySQL", "mysql"}, {"PostgreSQL", "postgres"},
+    {"Oracle", "oracle"}, {"SQL Server", "MSSQLSvc"}, {"IBM Db2", "db2"},
+    {"SAP HANA", "hana"}, {"Informix", "informix"}, {"MongoDB", "mongodb"},
+    {"Cassandra", "cassandra"}, {"Redis", "redis"},
+    {"XMPP", "xmpp"}, {"Kafka", "kafka"}, {"ZooKeeper", "zookeeper"},
+    {"RabbitMQ", "rabbitmq"}, {"ActiveMQ", "activemq"},
+    {"Tomcat", "tomcat"}, {"JBoss / WildFly", "jboss"},
+    {"WebSphere", "was"}, {"WebLogic", "weblogic"}, {"Jenkins", "jenkins"},
+    {"Elasticsearch", "elasticsearch"}, {"Solr", "solr"}, {"Docker", "docker"},
+    {"SSH", "ssh"}, {"FTP", "ftp"}, {"SFTP", "sftp"},
+    {"AFS", "afs"}, {"Ceph", "ceph"},
+    {"DNS", "DNS"}, {"DHCP", "dhcp"}, {"RADIUS", "radius"},
+    {"TACACS+", "tacacs"}, {"Nagios", "nagios"}, {"Zabbix", "zabbix"},
+    {"Prometheus", "prometheus"}, {"Kubernetes", "kubernetes"},
+    {"Hadoop NameNode", "nn"}, {"Hadoop DataNode", "dn"},
+    {"etcd", "etcd"}, {"NTP", "ntp"}
 };
 #define CATEGORY_COUNT (sizeof(categories) / sizeof(categories[0]))
 
@@ -37,7 +53,7 @@ static void usage(FILE *out)
         "List MIT Kerberos principals using the current Kerberos credential cache.\n\n"
         "Options:\n"
         "  -u, --users             List user principals only\n"
-        "  -t, --type TYPE         List one type (users, HTTP, cifs, host, imap, smtp, ldap, nfs, mysql, postgres)\n"
+        "  -t, --type TYPE         List one type (users, HTTP, cifs, host, imap, smtp, ldap, nfs, mysql, postgres, oracle, MSSQLSvc, db2, hana, informix, mongodb, cassandra, redis, xmpp, kafka, zookeeper, rabbitmq, activemq, tomcat, jboss, was, weblogic, jenkins, elasticsearch, solr, docker, ssh, ftp, sftp, afs, ceph, DNS, dhcp, radius, tacacs, nagios, zabbix, prometheus, kubernetes, nn, dn, etcd, ntp)\n"
         "  -f, --filter PATTERN    Case-insensitive shell-style principal filter\n"
         "  -r, --realm REALM       Restrict results to REALM\n"
         "  -i, --info              Show default realm and configured Kerberos servers\n"
