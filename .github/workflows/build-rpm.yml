@@ -6,6 +6,8 @@ on:
     branches: [main]
     paths:
       - "src/**"
+      - "man/**"
+      - "README.md"
       - "Makefile"
       - "packaging/**"
       - "scripts/**"
