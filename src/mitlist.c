@@ -199,9 +199,9 @@ static void print_profile_values(profile_t profile, const char *realm, const cha
 
     if (code == 0 && values && values[0]) {
         for (size_t i = 0; values[i]; ++i)
-            printf("%s: %s\\n", label, values[i]);
+            printf("%s: %s\n", label, values[i]);
     } else {
-        printf("%s: (not explicitly configured)\\n", label);
+        printf("%s: (not explicitly configured)\n", label);
     }
     if (values) profile_free_list(values);
 }
@@ -214,22 +214,22 @@ static int show_info(void)
     long code;
 
     if (krb5_init_context(&context) != 0) {
-        fprintf(stderr, PROGRAM ": cannot initialize Kerberos library\\n");
+        fprintf(stderr, PROGRAM ": cannot initialize Kerberos library\n");
         return EXIT_FAILURE;
     }
     code = krb5_get_default_realm(context, &realm);
     if (code != 0) {
         const char *message = krb5_get_error_message(context, code);
-        fprintf(stderr, PROGRAM ": cannot determine the default realm: %s\\n",
+        fprintf(stderr, PROGRAM ": cannot determine the default realm: %s\n",
                 message ? message : "Kerberos error");
         if (message) krb5_free_error_message(context, message);
         krb5_free_context(context);
         return EXIT_FAILURE;
     }
-    printf("Default realm: %s\\n", realm);
+    printf("Default realm: %s\n", realm);
     code = krb5_get_profile(context, &profile);
     if (code != 0) {
-        fprintf(stderr, PROGRAM ": cannot read the active Kerberos configuration\\n");
+        fprintf(stderr, PROGRAM ": cannot read the active Kerberos configuration\n");
         krb5_free_default_realm(context, realm);
         krb5_free_context(context);
         return EXIT_FAILURE;
