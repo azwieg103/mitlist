@@ -107,7 +107,7 @@ static char *canonical_admin_server(krb5_context context, const char *server)
     host = malloc(host_len + 1);
     if (!host) return NULL;
     memcpy(host, server, host_len);
-    host[host_len] = '\\0';
+    host[host_len] = '\0';
 
     code = krb5_expand_hostname(context, host, &canonical_host);
     free(host);
@@ -187,7 +187,7 @@ static int run_kadmin(string_list *principals)
 
     canonical_server = canonical_admin_server(context, admin_server);
     if (!canonical_server) {
-        fprintf(stderr, PROGRAM ": cannot canonicalize configured admin_server '%s'\\n",
+        fprintf(stderr, PROGRAM ": cannot canonicalize configured admin_server '%s'\n",
                 admin_server);
         profile_release_string(admin_server);
         krb5_free_context(context);
