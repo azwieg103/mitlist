@@ -144,6 +144,7 @@ static krb5_error_code acquire_admin_ticket(krb5_context context,
     char *host = NULL;
     krb5_principal principal = NULL;
     krb5_ccache cache = NULL;
+    krb5_creds request = {0};
     krb5_creds *credentials = NULL;
     krb5_error_code code;
 
@@ -174,10 +175,14 @@ static krb5_error_code acquire_admin_ticket(krb5_context context,
     code = krb5_cc_default(context, &cache);
     if (code != 0) goto cleanup;
 
-    code = krb5_get_credentials(context, 0, cache, principal, &credentials);
+    code = krb5_cc_get_principal(context, cache, &request.client);
+    if (code != 0) goto cleanup;
+    request.server = principal;
+    code = krb5_get_credentials(context, 0, cache, &request, &credentials);
 
 cleanup:
     if (credentials) krb5_free_creds(context, credentials);
+    if (request.client) krb5_free_principal(context, request.client);
     if (cache) krb5_cc_close(context, cache);
     if (principal) krb5_free_principal(context, principal);
     return code;
