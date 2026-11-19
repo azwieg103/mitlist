@@ -343,7 +343,8 @@ static int execute_kadmin(const char *cache_name, const char *server, string_lis
         if (!n) continue;
         if (strchr(line, '@') && strpbrk(line, " \t") == NULL) {
             if (list_add(principals, line) < 0) { fprintf(stderr, PROGRAM ": out of memory\n"); fclose(stream); waitpid(child, &status, 0); return -1; }
-        } else if (strncmp(line, "Authenticating as principal ", 28) != 0) {
+        } else if (strncmp(line, "Authenticating as principal ", 28) != 0 &&
+                   strcmp(line, "Administration credentials NOT DESTROYED.") != 0) {
             fprintf(stderr, PROGRAM ": %s\n", line);
         }
     }
@@ -446,9 +447,9 @@ static int run_kadmin(string_list *principals)
         }
         list_free(principals);
         memset(principals, 0, sizeof(*principals));
-        if (attempt == 0) fprintf(stderr, PROGRAM ": kadmin rejected the refreshed service ticket; reacquiring it and retrying once\n");
+        if (attempt == 0) fprintf(stderr, PROGRAM ": kadmin command failed; refreshing the service ticket and retrying once\n");
     }
-    fprintf(stderr, PROGRAM ": kadmin failed after service-ticket refresh. Check kadmind access, the Kerberos 'list' ACL, and admin_server configuration.\n");
+    fprintf(stderr, PROGRAM ": kadmin command failed after service-ticket refresh and retry. Check the kadmin diagnostic above, kadmind access, the Kerberos 'list' ACL, and admin_server configuration.\n");
     krb5_free_default_realm(context, ticket_realm);
     free(canonical_server);
     krb5_free_context(context);
