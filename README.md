@@ -12,6 +12,7 @@ The project is hosted at [github.com/azwieg103/mitlist](https://github.com/azwie
 > ```
 >
 > Add this on the KDC (not the client), then restart kadmind. Without this ACL entry, mitlist cannot list principals, even when the user has a valid Kerberos ticket. This grants realm-wide name listing only; it does not grant principal or key administration rights. See [Kerberos access: read-only users](#kerberos-access-read-only-users) for exact setup and security scope.
+
 ## What it lists
 
 | Group | Principal form |
