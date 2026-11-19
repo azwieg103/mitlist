@@ -14,7 +14,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define MITLIST_VERSION "0.1.3"
+#define MITLIST_VERSION "0.1.4"
 #define PROGRAM "mitlist"
 #define MAX_LINE 8192
 
@@ -37,6 +37,7 @@ static void usage(FILE *out)
         "  -t, --type TYPE         List one type (users, HTTP, cifs, host, imap, smtp, ldap, nfs)\n"
         "  -f, --filter PATTERN    Case-insensitive shell-style principal filter\n"
         "  -r, --realm REALM       Restrict results to REALM\n"
+        "  -i, --info              Show default realm and configured Kerberos servers\n"
         "  -h, --help              Show this help\n"
         "      --version           Show version\n\n"
         "Type names, options, and filters are case-insensitive.\n"
@@ -188,6 +189,61 @@ cleanup:
     return code;
 }
 
+
+static void print_profile_values(profile_t profile, const char *realm, const char *key,
+                                 const char *label)
+{
+    const char *names[] = { "realms", realm, key, NULL };
+    char **values = NULL;
+    long code = profile_get_values(profile, names, &values);
+
+    if (code == 0 && values && values[0]) {
+        for (size_t i = 0; values[i]; ++i)
+            printf("%s: %s\\n", label, values[i]);
+    } else {
+        printf("%s: (not explicitly configured)\\n", label);
+    }
+    if (values) profile_free_list(values);
+}
+
+static int show_info(void)
+{
+    krb5_context context = NULL;
+    profile_t profile = NULL;
+    char *realm = NULL;
+    long code;
+
+    if (krb5_init_context(&context) != 0) {
+        fprintf(stderr, PROGRAM ": cannot initialize Kerberos library\\n");
+        return EXIT_FAILURE;
+    }
+    code = krb5_get_default_realm(context, &realm);
+    if (code != 0) {
+        const char *message = krb5_get_error_message(context, code);
+        fprintf(stderr, PROGRAM ": cannot determine the default realm: %s\\n",
+                message ? message : "Kerberos error");
+        if (message) krb5_free_error_message(context, message);
+        krb5_free_context(context);
+        return EXIT_FAILURE;
+    }
+    printf("Default realm: %s\\n", realm);
+    code = krb5_get_profile(context, &profile);
+    if (code != 0) {
+        fprintf(stderr, PROGRAM ": cannot read the active Kerberos configuration\\n");
+        krb5_free_default_realm(context, realm);
+        krb5_free_context(context);
+        return EXIT_FAILURE;
+    }
+    print_profile_values(profile, realm, "kdc", "KDC");
+    print_profile_values(profile, realm, "admin_server", "Admin server");
+    puts("Note: if no KDC is explicitly listed, MIT Kerberos may use DNS discovery");
+    puts("      according to dns_lookup_kdc and the realm's DNS SRV records.");
+    profile_release(profile);
+    krb5_free_default_realm(context, realm);
+    krb5_free_context(context);
+    return EXIT_SUCCESS;
+}
+
 static int run_kadmin(string_list *principals)
 {
     krb5_context context = NULL;
@@ -289,6 +345,7 @@ static int run_kadmin(string_list *principals)
     if (child == 0) {
         close(pipefd[0]);
         if (dup2(pipefd[1], STDOUT_FILENO) < 0) _exit(126);
+        if (dup2(STDOUT_FILENO, STDERR_FILENO) < 0) _exit(126);
         close(pipefd[1]);
         execlp("kadmin", "kadmin", "-c", cache_name, "-s", canonical_server,
                "-q", "list_principals", (char *)NULL);
@@ -366,26 +423,35 @@ int main(int argc, char **argv)
 {
     string_list principals = {0};
     const char *type = NULL, *filter = NULL, *realm = NULL;
-    int users_only = 0, selected = -1, option, rc = EXIT_FAILURE;
+    int users_only = 0, show_info_flag = 0, selected = -1, option, rc = EXIT_FAILURE;
     static const struct option options[] = {
         {"users", no_argument, NULL, 'u'}, {"USERS", no_argument, NULL, 'u'},
         {"type", required_argument, NULL, 't'}, {"TYPE", required_argument, NULL, 't'},
         {"filter", required_argument, NULL, 'f'}, {"FILTER", required_argument, NULL, 'f'},
         {"realm", required_argument, NULL, 'r'}, {"REALM", required_argument, NULL, 'r'},
+        {"info", no_argument, NULL, 'i'}, {"INFO", no_argument, NULL, 'i'},
         {"help", no_argument, NULL, 'h'}, {"HELP", no_argument, NULL, 'h'},
         {"version", no_argument, NULL, 1000}, {NULL, 0, NULL, 0}
     };
 
-    while ((option = getopt_long(argc, argv, "uUt:T:f:F:r:R:hH", options, NULL)) != -1) {
+    while ((option = getopt_long(argc, argv, "uUt:T:f:F:r:R:iI:hH", options, NULL)) != -1) {
         switch (option == 1000 ? 1000 : tolower((unsigned char)option)) {
         case 'u': users_only = 1; break;
         case 't': type = optarg; break;
         case 'f': filter = optarg; break;
         case 'r': realm = optarg; break;
+        case 'i': show_info_flag = 1; break;
         case 'h': usage(stdout); return EXIT_SUCCESS;
         case 1000: puts(PROGRAM " " MITLIST_VERSION); return EXIT_SUCCESS;
         default: usage(stderr); return EXIT_FAILURE;
         }
+    }
+    if (show_info_flag) {
+        if (optind != argc || users_only || type || filter || realm) {
+            fprintf(stderr, PROGRAM ": --info cannot be combined with listing filters\n");
+            return EXIT_FAILURE;
+        }
+        return show_info();
     }
     if (optind < argc) {
         if (filter) { fprintf(stderr, PROGRAM ": specify a filter only once\n"); return EXIT_FAILURE; }
