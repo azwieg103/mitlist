@@ -1,5 +1,5 @@
 Name:           mitlist
-Version:        0.1.5
+Version:        0.1.6
 Release:        %{?rpm_release}%{!?rpm_release:ZWIEGNET.1.el10}
 Summary:        List MIT Kerberos principals by principal type
 License:        MIT
@@ -29,6 +29,9 @@ rm -rf %{buildroot}
 %{_mandir}/man1/mitlist.1*
 
 %changelog
+* Thu Nov 19 2026 Andrew Zwieg <andyzwieg@gmail.com> - 0.1.6-ZWIEGNET.1.el10
+- Recognize common database, messaging, application, storage, and infrastructure service principal prefixes; omit empty categories.
+
 * Thu Nov 19 2026 Andrew Zwieg <andyzwieg@gmail.com> - 0.1.5-ZWIEGNET.1.el10
 - Display live Kerberos DNS SRV records, refresh a rejected admin service ticket once, and group MySQL/PostgreSQL principals separately.
 
