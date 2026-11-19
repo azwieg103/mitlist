@@ -1,4 +1,4 @@
-.TH MITLIST 1 "November 2026" "mitlist 0.1.6" "User Commands"
+.TH MITLIST 1 "19 November 2026" "mitlist 0.1.6" "User Commands"
 .SH NAME
 mitlist \- list MIT Kerberos principals by principal type
 .SH SYNOPSIS
@@ -11,7 +11,13 @@ is a read-only command-line utility that lists principal names from an MIT Kerbe
 It uses the default Kerberos credential cache and the realm's configured
 .B admin_server
 from the active Kerberos configuration.
-It obtains the required admin-service ticket automatically when needed.
+Before invoking
+.BR kadmin ,
+it refreshes the
+.B kadmin/hostname
+service ticket for the canonical configured admin-server hostname in the default credential cache.
+Only that matching service credential is removed and reacquired; the user's TGT and unrelated cached credentials are preserved.
+If the remote listing operation rejects the refreshed ticket, mitlist reacquires it and retries once.
 .PP
 Principals are grouped into Users, common database, messaging, application, storage, and infrastructure service categories, and Other. A category is printed only when at least one principal with its recognized service prefix is returned.
 Entries are sorted alphabetically within each category. Empty categories are omitted.
@@ -145,8 +151,37 @@ If explicit KDC entries are absent, MIT Kerberos can use DNS-based KDC discovery
 .PP
 A valid TGT must already be present in the default credential cache.
 .B mitlist
-does not prompt for or store a password and does not require an administrative principal such as
+uses the cache's client principal; it does not force an administrative identity such as
 .BR alice/admin@EXAMPLE.COM .
+It does not prompt for or store a password.
+.PP
+The admin service ticket is refreshed on each invocation to avoid reusing a stale ticket from a persistent cache.
+The refresh affects only the matching
+.B kadmin/hostname
+credential, not the TGT or other service tickets.
+If
+.B kadmin
+rejects the refreshed ticket, mitlist makes one additional acquisition and listing attempt.
+A repeated failure should be investigated as an authentication, server, network, or ACL problem rather than worked around by destroying the credential cache.
+.SH ENVIRONMENT
+.TP
+.B KRB5_CONFIG
+Selects the Kerberos configuration file used to determine the default realm and configured
+.BR admin_server .
+.TP
+.B KRB5CCNAME
+Selects the default Kerberos credential cache. If unset, MIT Kerberos uses its configured default cache.
+.TP
+.B KRB5_TRACE
+When set to a file path (or a supported trace destination), enables MIT Kerberos library tracing.
+For example:
+.PP
+.nf
+KRB5_TRACE=/tmp/mitlist-krb5.trace mitlist --users
+.fi
+.PP
+The trace can show service-ticket acquisition and the Kerberos authenticator exchange.
+Trace files may contain sensitive authentication metadata; protect them and avoid publishing them publicly.
 .SH EXAMPLES
 .TP
 List all principals:
