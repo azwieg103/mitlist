@@ -1,4 +1,4 @@
-.TH MITLIST 1 "November 2026" "mitlist 0.1.5" "User Commands"
+.TH MITLIST 1 "November 2026" "mitlist 0.1.6" "User Commands"
 .SH NAME
 mitlist \- list MIT Kerberos principals by principal type
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ from the active Kerberos configuration.
 It obtains the required admin-service ticket automatically when needed.
 .PP
 Principals are grouped into Users, common database, messaging, application, storage, and infrastructure service categories, and Other. A category is printed only when at least one principal with its recognized service prefix is returned.
-Entries are sorted alphabetically within each category.
+Entries are sorted alphabetically within each category. Empty categories are omitted.
 Matching of option names, type names, and filters is case-insensitive.
 .SH KDC AUTHORIZATION REQUIREMENT
 The ordinary Kerberos principal running
@@ -55,11 +55,11 @@ List only one category. Supported values are
 .BR imap ,
 .BR smtp ,
 .BR ldap ,
-and the service types
+.BR nfs ,
 .BR mysql ,
 .BR postgres ,
 .BR oracle ,
-.BR MSSQLSvc ,
+.BR mssqlsvc ,
 .BR db2 ,
 .BR hana ,
 .BR informix ,
@@ -84,7 +84,7 @@ and the service types
 .BR sftp ,
 .BR afs ,
 .BR ceph ,
-.BR DNS ,
+.BR dns ,
 .BR dhcp ,
 .BR radius ,
 .BR tacacs ,
@@ -97,7 +97,12 @@ and the service types
 .BR etcd ,
 and
 .BR ntp .
-Type matching is case-insensitive.
+These names select principals by the service component before the slash; for example,
+.B mssqlsvc
+matches
+.B MSSQLSvc/hostname@REALM .
+A type heading is displayed only when matching principals exist.
+
 .TP
 .BR -f " " PATTERN ", " --filter=PATTERN
 List only principals matching PATTERN. Matching is case-insensitive and uses shell-style filename pattern syntax as implemented by
