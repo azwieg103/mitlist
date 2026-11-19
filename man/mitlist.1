@@ -13,7 +13,7 @@ It uses the default Kerberos credential cache and the realm's configured
 from the active Kerberos configuration.
 It obtains the required admin-service ticket automatically when needed.
 .PP
-Principals are grouped into Users, HTTP, CIFS, Host, IMAP, SMTP, LDAP, NFS, MySQL, PostgreSQL, and Other categories.
+Principals are grouped into Users, common database, messaging, application, storage, and infrastructure service categories, and Other. A category is printed only when at least one principal with its recognized service prefix is returned.
 Entries are sorted alphabetically within each category.
 Matching of option names, type names, and filters is case-insensitive.
 .SH KDC AUTHORIZATION REQUIREMENT
@@ -55,8 +55,48 @@ List only one category. Supported values are
 .BR imap ,
 .BR smtp ,
 .BR ldap ,
+and the service types
+.BR mysql ,
+.BR postgres ,
+.BR oracle ,
+.BR MSSQLSvc ,
+.BR db2 ,
+.BR hana ,
+.BR informix ,
+.BR mongodb ,
+.BR cassandra ,
+.BR redis ,
+.BR xmpp ,
+.BR kafka ,
+.BR zookeeper ,
+.BR rabbitmq ,
+.BR activemq ,
+.BR tomcat ,
+.BR jboss ,
+.BR was ,
+.BR weblogic ,
+.BR jenkins ,
+.BR elasticsearch ,
+.BR solr ,
+.BR docker ,
+.BR ssh ,
+.BR ftp ,
+.BR sftp ,
+.BR afs ,
+.BR ceph ,
+.BR DNS ,
+.BR dhcp ,
+.BR radius ,
+.BR tacacs ,
+.BR nagios ,
+.BR zabbix ,
+.BR prometheus ,
+.BR kubernetes ,
+.BR nn ,
+.BR dn ,
+.BR etcd ,
 and
-.BR nfs .
+.BR ntp .
 Type matching is case-insensitive.
 .TP
 .BR -f " " PATTERN ", " --filter=PATTERN
