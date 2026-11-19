@@ -25,8 +25,10 @@ The project is hosted at [github.com/azwieg103/mitlist](https://github.com/azwie
 | SMTP | `smtp/hostname@REALM` |
 | LDAP | `ldap/hostname@REALM` |
 | NFS | `nfs/hostname@REALM` |
+| MySQL | `mysql/hostname@REALM` |
+| PostgreSQL | `postgres/hostname@REALM` |
 
-User principals are principals without a service component (a slash). Service names are matched case-insensitively. Other principal types are retained in an **Other** group. Entries are sorted alphabetically within each group.
+User principals are principals without a service component (a slash). Service names are matched case-insensitively. MySQL and PostgreSQL principals have their own groups. Other principal types are retained in an **Other** group. Entries are sorted alphabetically within each group.
 
 ## Usage
 
