@@ -12,6 +12,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#define MITLIST_VERSION "0.1.0"
+
 #define PROGRAM "mitlist"
 #define MAX_LINE 8192
 
@@ -209,16 +211,21 @@ int main(int argc, char **argv)
     int users_only = 0, selected = -1, option, rc = EXIT_FAILURE;
     static const struct option options[] = {
         {"users", no_argument, NULL, 'u'},
+        {"USERS", no_argument, NULL, 'u'},
         {"type", required_argument, NULL, 't'},
+        {"TYPE", required_argument, NULL, 't'},
         {"filter", required_argument, NULL, 'f'},
+        {"FILTER", required_argument, NULL, 'f'},
         {"realm", required_argument, NULL, 'r'},
+        {"REALM", required_argument, NULL, 'r'},
         {"help", no_argument, NULL, 'h'},
+        {"HELP", no_argument, NULL, 'h'},
         {"version", no_argument, NULL, 1000},
         {NULL, 0, NULL, 0}
     };
 
-    while ((option = getopt_long(argc, argv, "ut:f:r:h", options, NULL)) != -1) {
-        switch (option) {
+    while ((option = getopt_long(argc, argv, "uUt:T:f:F:r:R:hH", options, NULL)) != -1) {
+        switch (tolower((unsigned char)option)) {
         case 'u': users_only = 1; break;
         case 't': type = optarg; break;
         case 'f': filter = optarg; break;
