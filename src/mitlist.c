@@ -26,7 +26,7 @@ static const category categories[] = {
     {"HTTP", "http"}, {"CIFS", "cifs"}, {"Host", "host"},
     {"IMAP", "imap"}, {"SMTP", "smtp"}, {"LDAP", "ldap"}, {"NFS", "nfs"},
     {"MySQL", "mysql"}, {"PostgreSQL", "postgres"},
-    {"Oracle", "oracle"}, {"SQL Server", "MSSQLSvc"}, {"IBM Db2", "db2"},
+    {"Oracle", "oracle"}, {"SQL Server", "mssqlsvc"}, {"IBM Db2", "db2"},
     {"SAP HANA", "hana"}, {"Informix", "informix"}, {"MongoDB", "mongodb"},
     {"Cassandra", "cassandra"}, {"Redis", "redis"},
     {"XMPP", "xmpp"}, {"Kafka", "kafka"}, {"ZooKeeper", "zookeeper"},
@@ -36,7 +36,7 @@ static const category categories[] = {
     {"Elasticsearch", "elasticsearch"}, {"Solr", "solr"}, {"Docker", "docker"},
     {"SSH", "ssh"}, {"FTP", "ftp"}, {"SFTP", "sftp"},
     {"AFS", "afs"}, {"Ceph", "ceph"},
-    {"DNS", "DNS"}, {"DHCP", "dhcp"}, {"RADIUS", "radius"},
+    {"DNS", "dns"}, {"DHCP", "dhcp"}, {"RADIUS", "radius"},
     {"TACACS+", "tacacs"}, {"Nagios", "nagios"}, {"Zabbix", "zabbix"},
     {"Prometheus", "prometheus"}, {"Kubernetes", "kubernetes"},
     {"Hadoop NameNode", "nn"}, {"Hadoop DataNode", "dn"},
@@ -516,7 +516,7 @@ int main(int argc, char **argv)
         if (!normalized) return EXIT_FAILURE;
         if (!strcmp(normalized, "user") || !strcmp(normalized, "users")) selected = 0;
         else for (size_t i = 1; i < CATEGORY_COUNT; ++i)
-            if (!strcmp(normalized, categories[i].service)) selected = (int)i;
+            if (!strcasecmp(normalized, categories[i].service)) selected = (int)i;
         free(normalized);
         if (selected < 0) {
             fprintf(stderr, PROGRAM ": unknown principal type: %s\n", type);
