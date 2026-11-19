@@ -18,17 +18,14 @@ The project is hosted at [github.com/azwieg103/mitlist](https://github.com/azwie
 | Group | Principal form |
 |---|---|
 | Users | `username@REALM` |
-| HTTP | `HTTP/hostname@REALM` |
-| CIFS | `cifs/hostname@REALM` |
-| Host | `host/hostname@REALM` |
-| IMAP | `imap/hostname@REALM` |
-| SMTP | `smtp/hostname@REALM` |
-| LDAP | `ldap/hostname@REALM` |
-| NFS | `nfs/hostname@REALM` |
-| MySQL | `mysql/hostname@REALM` |
-| PostgreSQL | `postgres/hostname@REALM` |
+| HTTP, CIFS, Host, IMAP, SMTP, LDAP, NFS | `HTTP/`, `cifs/`, `host/`, `imap/`, `smtp/`, `ldap/`, `nfs/` |
+| MySQL, PostgreSQL, Oracle, SQL Server, IBM Db2, SAP HANA, Informix, MongoDB, Cassandra, Redis | `mysql/`, `postgres/`, `oracle/`, `MSSQLSvc/`, `db2/`, `hana/`, `informix/`, `mongodb/`, `cassandra/`, `redis/` |
+| XMPP, Kafka, ZooKeeper, RabbitMQ, ActiveMQ | `xmpp/`, `kafka/`, `zookeeper/`, `rabbitmq/`, `activemq/` |
+| Tomcat, JBoss/WildFly, WebSphere, WebLogic, Jenkins, Elasticsearch, Solr, Docker | `tomcat/`, `jboss/`, `was/`, `weblogic/`, `jenkins/`, `elasticsearch/`, `solr/`, `docker/` |
+| SSH, FTP, SFTP, AFS, Ceph | `ssh/`, `ftp/`, `sftp/`, `afs/`, `ceph/` |
+| DNS, DHCP, RADIUS, TACACS+, Nagios, Zabbix, Prometheus, Kubernetes, Hadoop NameNode/DataNode, etcd, NTP | `DNS/`, `dhcp/`, `radius/`, `tacacs/`, `nagios/`, `zabbix/`, `prometheus/`, `kubernetes/`, `nn/`, `dn/`, `etcd/`, `ntp/` |
 
-User principals are principals without a service component (a slash). Service names are matched case-insensitively. MySQL and PostgreSQL principals have their own groups. Other principal types are retained in an **Other** group. Entries are sorted alphabetically within each group.
+User principals are principals without a service component (a slash). Service names are matched case-insensitively. Each service group is printed only when the Kerberos database returns at least one matching principal; absent service types produce no empty headings. SQL Server uses the common `MSSQLSvc/` SPN convention. SFTP and SSH are separate optional naming conventions even though many SFTP deployments use SSH host principals. Other principal types are retained in an **Other** group. Entries are sorted alphabetically within each group.
 
 ## Usage
 
