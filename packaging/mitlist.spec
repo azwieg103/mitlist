@@ -1,5 +1,5 @@
 Name:           mitlist
-Version:        0.1.3
+Version:        0.1.4
 Release:        %{?rpm_release}%{!?rpm_release:ZWIEGNET.1.el10}
 Summary:        List MIT Kerberos principals by principal type
 License:        MIT
@@ -9,6 +9,7 @@ BuildRequires:  gcc
 BuildRequires:  make
 BuildRequires:  krb5-devel
 Requires:       krb5-workstation
+BuildRequires:  gzip
 
 %description
 mitlist is a read-only command-line utility that lists MIT Kerberos
@@ -26,8 +27,12 @@ rm -rf %{buildroot}
 
 %files
 %{_bindir}/mitlist
+%{_mandir}/man1/mitlist.1*
 
 %changelog
+* Thu Nov 19 2026 Package Maintainer <packages@example.invalid> - 0.1.4-1.el10
+- Add --info server discovery output, clean command output, and install the man page.
+
 * Thu Nov 19 2026 ZWIEGNET <packages@zwiegnet.com> - 0.1.3-ZWIEGNET.1.el10
 - Acquire the kadmin service ticket into the default cache before listing principals.
 
