@@ -59,10 +59,10 @@ On the primary KDC, as the Kerberos administrator:
 
 1. Find the ACL file configured by `acl_file` in `kdc.conf`. If it is not set, the default is normally `LOCALSTATEDIR/krb5kdc/kadm5.acl` (the exact path depends on how MIT Kerberos was packaged).
 2. Back up the ACL file.
-3. Add a line for the exact ordinary user principal. For the example user in the `ZWIEGNET.COM` realm:
+3. Add a line for the exact ordinary user principal. For example, in the `YOURDOMAIN.COM` realm:
 
    ```text
-   andrew@ZWIEGNET.COM    l
+   alice@YOURDOMAIN.COM    l
    ```
 
 4. Put this entry before any broader matching entry that could determine the user's permissions. ACL evaluation is order-sensitive: the first matching entry controls.
@@ -83,7 +83,7 @@ klist
 Then test the remote read-only operation using the user's ordinary principal (replace the realm/principal as appropriate):
 
 ```bash
-kadmin -c "$KRB5CCNAME" -s cldap2.zwiegnet.com:749 -q list_principals
+kadmin -c "$KRB5CCNAME" -s kdc.yourdomain.com:749 -q list_principals
 ```
 
 If that succeeds, run:
@@ -107,13 +107,13 @@ If the command fails, check the exact principal shown by `klist`, the ACL entry 
 
 ## Build and installation
 
-The primary packaging target is **AlmaLinux 10 x86_64**. The project follows the ZWIEGNET RPM release approach used by [azwieg103/gnucobol](https://github.com/azwieg103/gnucobol):
+The primary packaging target is **AlmaLinux 10 x86_64**. RPM releases use an automated, repeatable packaging workflow:
 
 - Build in an AlmaLinux 10.
 - Produce installable binary RPMs and a source RPM.
 - Run build and command-line validation checks before publishing.
 - Publish successful packages as GitHub Release assets.
-- Increment the ZWIEGNET rebuild number for each published build of the same project version.
+- Increment the RPM release number for each published rebuild of the same project version.
 - Trigger builds automatically when relevant source or packaging files change, with a manual workflow-dispatch option.
 
 Windows builds are the next priority after the AlmaLinux 10 package. Additional Enterprise Linux and other supported platforms can follow.
