@@ -27,7 +27,7 @@ done
 rm -rf "$WORK" "$TOP" "$DIST"
 mkdir -p "$WORK/mitlist" "$TOP/BUILD" "$TOP/BUILDROOT" "$TOP/RPMS" \
   "$TOP/SOURCES" "$TOP/SPECS" "$TOP/SRPMS" "$DIST"
-cp -a "$ROOT/Makefile" "$ROOT/src" "$ROOT/README.md" "$WORK/mitlist/"
+cp -a "$ROOT/Makefile" "$ROOT/src" "$ROOT/man" "$ROOT/README.md" "$WORK/mitlist/"
 tar -czf "$TOP/SOURCES/mitlist-$VERSION.tar.gz" -C "$WORK" mitlist
 
 rpmbuild -ba "$ROOT/packaging/mitlist.spec" \
