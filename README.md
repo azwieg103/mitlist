@@ -1,33 +1,25 @@
 # mitlist
 
-**mitlist** is a read-only command-line listing utility for MIT Kerberos V5. It is intended to provide an `ldaplist`-style view of principals, grouped by principal type and sorted alphabetically.
+**mitlist** is a read-only command-line listing utility for MIT Kerberos V5. It provides an `ldaplist`-style view of principals, grouped by principal type and sorted alphabetically.
 
 The project is hosted at [github.com/azwieg103/mitlist](https://github.com/azwieg103/mitlist).
 
-> **Development status:** Initial C implementation and AlmaLinux 10 RPM automation are now in place. The first CI build is still required to validate the package end to end.
-
 ## What it lists
 
-mitlist will query the MIT Kerberos administration interface and organize principals into these groups:
+| Group | Principal form |
+|---|---|
+| Users | `username@REALM` |
+| HTTP | `HTTP/hostname@REALM` |
+| CIFS | `cifs/hostname@REALM` |
+| Host | `host/hostname@REALM` |
+| IMAP | `imap/hostname@REALM` |
+| SMTP | `smtp/hostname@REALM` |
+| LDAP | `ldap/hostname@REALM` |
+| NFS | `nfs/hostname@REALM` |
 
-| Group | Principal form | Display form |
-|---|---|---|
-| Users | `username@REALM` | `username@REALM` |
-| HTTP | `HTTP/hostname@REALM` | `HTTP/hostname@REALM` |
-| CIFS | `cifs/hostname@REALM` | `cifs/hostname@REALM` |
-| Host | `host/hostname@REALM` | `host/hostname@REALM` |
-| IMAP | `imap/hostname@REALM` | `imap/hostname@REALM` |
-| SMTP | `smtp/hostname@REALM` | `smtp/hostname@REALM` |
-| LDAP | `ldap/hostname@REALM` | `ldap/hostname@REALM` |
-| NFS | `nfs/hostname@REALM` | `nfs/hostname@REALM` |
+User principals are principals without a service component (a slash). Service names are matched case-insensitively. Other principal types are retained in an **Other** group. Entries are sorted alphabetically within each group.
 
-User principals are principals without a service component (a slash). Service principal matching is case-insensitive for the service name. Principals outside the listed groups should be retained in an **Other** group rather than silently discarded.
-
-Each group will be sorted alphabetically by its complete principal name. Groups will be printed in the order shown above, followed by **Other** when needed.
-
-## Intended usage
-
-The goal is a familiar, simple interface:
+## Usage
 
 ```bash
 # List all principals
@@ -36,62 +28,95 @@ mitlist
 # List only user principals
 mitlist -u
 
-# List a specific service class
+# List a service class (case-insensitive)
 mitlist -t HTTP
 mitlist -t cifs
-mitlist -t host
 
 # Filter principal names
 mitlist -f 'www*'
 
-# Select a realm or administrative server
+# Restrict to a realm
 mitlist -r EXAMPLE.COM
-mitlist -h kadmin.example.com
 
-# Show help
+# Help and version
 mitlist --help
+mitlist --version
 ```
 
-The initial implementation supports these options (option names and values are case-insensitive):
+Options and filters are case-insensitive. The optional positional pattern is equivalent to `--filter`; matching uses case-insensitive shell-style wildcards.
+
+## Kerberos access: read-only users
+
+mitlist uses the MIT Kerberos remote administration protocol to list principal names. It does **not** read the KDC database directly and does not add, modify, delete, or extract keys.
+
+**A normal user does not need an administrative principal such as `andrew/admin@REALM`.** The current implementation explicitly authenticates to kadmin as the exact principal stored in the user's default credential cache. The administrator can grant that ordinary principal only the `list` ACL permission.
+
+MIT Kerberos does not provide a general unauthorised principal-enumeration operation. The supported way to allow this read-only listing is the `l` permission in `kadm5.acl`.
+
+### Grant only the list permission
+
+On the primary KDC, as the Kerberos administrator:
+
+1. Find the ACL file configured by `acl_file` in `kdc.conf`. If it is not set, the default is normally `LOCALSTATEDIR/krb5kdc/kadm5.acl` (the exact path depends on how MIT Kerberos was packaged).
+2. Back up the ACL file.
+3. Add a line for the exact ordinary user principal. For the example user in the `ZWIEGNET.COM` realm:
+
+   ```text
+   andrew@ZWIEGNET.COM    l
+   ```
+
+4. Put this entry before any broader matching entry that could determine the user's permissions. ACL evaluation is order-sensitive: the first matching entry controls.
+5. Restart the administration daemon (`kadmind`) so it reloads the ACL.
+
+The lowercase `l` grants permission to list principals and policies. It does **not** grant permission to add (`a`), modify (`m`), delete (`d`), change passwords (`c`), inquire about individual principal records (`i`), or extract keys (`e`). Do not use `*`, `x`, or `admcil` for this use case.
+
+**Scope note:** MIT Kerberos defines list permission as a database-wide operation; it cannot be limited to a target-principal pattern in the ACL. The user will be able to see principal and policy names throughout the realm, but receives no key material or principal-management rights from this entry alone.
+
+### Verify access
+
+After the KDC administrator has updated the ACL and restarted kadmind, the user should have a valid TGT:
 
 ```bash
-mitlist -U
-mitlist -T HTTP
-mitlist -t http
-mitlist -F 'HTTP/*'
-mitlist -f 'http/*'
-mitlist -R ZWIEGNET.COM
-mitlist --TYPE cIfS
+klist
 ```
 
-The optional positional pattern is equivalent to `--filter`. Matching uses case-insensitive shell-style wildcards.
+Then test the remote read-only operation using the user's ordinary principal (replace the realm/principal as appropriate):
 
-## Kerberos access
+```bash
+kadmin -p andrew@ZWIEGNET.COM -q list_principals
+```
 
-mitlist is intended to use the MIT Kerberos `kadmin` interface to retrieve principal names. It will not read the Kerberos database directly and will not create, modify, or delete principals.
+If that succeeds, run:
 
-mitlist uses the current process's default Kerberos credential cache (including KEYRING caches such as `KEYRING:persistent:UID:...`). It uses the existing TGT to obtain a `kadmin/admin` service ticket and stores that service ticket in the same cache before invoking `kadmin -c`. It does not prompt for, store, or pass a password. The authenticated principal must be authorized by the Kerberos administrative ACL.
+```bash
+mitlist
+mitlist -u
+mitlist -t HTTP
+```
 
-The Kerberos administrative ACL must grant the authenticated identity the `list` privilege. mitlist is a listing tool; it does not need principal modification privileges.
+mitlist uses the default credential cache, including KEYRING caches. It does not prompt for or store a password. The KDC's configured admin server and the appropriate `kadmin/admin` or `kadmin/ADMINHOST` service principal must be available, and network access to kadmind must be permitted.
+
+If the command fails, check the exact principal shown by `klist`, the ACL entry and its position, the admin-server configuration, kadmind logs, and whether the KDC can issue the kadmin service ticket. A KDC policy rejection while requesting that service ticket is a separate issue from the ACL's `list` authorization; granting broader database privileges will not fix a service-ticket issuance failure.
 
 ## Requirements
 
 - MIT Kerberos V5 client utilities (including `kadmin`)
 - A configured Kerberos realm and reachable administration server
-- Valid Kerberos credentials with permission to list principals
+- A valid Kerberos credential cache
+- The authenticated principal's `list` ACL permission on the KDC
 
 ## Build and installation
 
-The primary packaging target is **AlmaLinux 10 x86_64**. The project will use the same ZWIEGNET RPM release approach as [azwieg103/gnucobol](https://github.com/azwieg103/gnucobol):
+The primary packaging target is **AlmaLinux 10 x86_64**. The project follows the ZWIEGNET RPM release approach used by [azwieg103/gnucobol](https://github.com/azwieg103/gnucobol):
 
-- Build in an AlmaLinux 10 environment.
+- Build in an AlmaLinux 10.
 - Produce installable binary RPMs and a source RPM.
-- Run build and validation checks before publishing.
+- Run build and command-line validation checks before publishing.
 - Publish successful packages as GitHub Release assets.
 - Increment the ZWIEGNET rebuild number for each published build of the same project version.
 - Trigger builds automatically when relevant source or packaging files change, with a manual workflow-dispatch option.
 
-Windows builds are the next priority after the AlmaLinux 10 package. Additional Enterprise Linux and other supported platforms can follow once the primary builds are reliable.
+Windows builds are the next priority after the AlmaLinux 10 package. Additional Enterprise Linux and other supported platforms can follow.
 
 On AlmaLinux 10, install `gcc`, `make`, `krb5-devel`, `krb5-workstation`, and `rpm-build`, then run:
 
@@ -99,16 +124,16 @@ On AlmaLinux 10, install `gcc`, `make`, `krb5-devel`, `krb5-workstation`, and `r
 bash scripts/build-rpm.sh
 ```
 
-The RPMs are written to `dist/`. GitHub Actions builds and publishes RPM and source RPM assets automatically when source or packaging files change on `main`.
+The RPMs are written to `dist/`. GitHub Actions builds and publishes RPM and source RPM assets automatically when relevant files change on `main`.
 
 ## Project goals
 
 1. Provide a concise, predictable listing of MIT Kerberos principals.
 2. Separate user principals from common service principals.
-3. Sort names alphabetically within each group for easy scanning and comparison.
+3. Sort names alphabetically within each group.
 4. Keep the utility read-only and rely on Kerberos ACLs for access control.
 5. Provide repeatable automated builds and downloadable release packages.
 
 ## License
 
-The project license will be specified in the source repository.
+See the repository license file.
