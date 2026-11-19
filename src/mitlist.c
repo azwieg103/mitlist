@@ -183,7 +183,7 @@ static krb5_error_code acquire_admin_ticket(krb5_context context,
     request.server = principal;
     if (force_refresh) {
         code = krb5_cc_remove_cred(context, cache,
-                                   KRB5_TC_MATCH_CLIENT | KRB5_TC_MATCH_SERVER,
+                                   0,
                                    &request);
         if (code != 0 && code != KRB5_CC_NOTFOUND) goto cleanup;
     }
