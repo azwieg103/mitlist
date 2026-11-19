@@ -1,0 +1,169 @@
+.TH MITLIST 1 "November 2026" "mitlist 0.1.4" "User Commands"
+.SH NAME
+mitlist \- list MIT Kerberos principals by principal type
+.SH SYNOPSIS
+.B mitlist
+.RI [ options ]
+.RI [ pattern ]
+.SH DESCRIPTION
+.B mitlist
+is a read-only command-line utility that lists principal names from an MIT Kerberos V5 realm through the remote administration service.
+It uses the default Kerberos credential cache and the realm's configured
+.B admin_server
+from the active Kerberos configuration.
+It obtains the required admin-service ticket automatically when needed.
+.PP
+Principals are grouped into Users, HTTP, CIFS, Host, IMAP, SMTP, LDAP, NFS, and Other categories.
+Entries are sorted alphabetically within each category.
+Matching of option names, type names, and filters is case-insensitive.
+.SH KDC AUTHORIZATION REQUIREMENT
+The ordinary Kerberos principal running
+.B mitlist
+MUST be granted the lowercase
+.B l
+(list) permission in the KDC's
+.B kadm5.acl
+file.
+For example:
+.PP
+.nf
+alice@EXAMPLE.COM    l
+.fi
+.PP
+The ACL is configured on the KDC, not on the client.
+After changing the ACL, the Kerberos administrator must restart
+.BR kadmind .
+The
+.B l
+permission allows realm-wide listing of principal and policy names.
+It does not grant add, modify, delete, password-change, individual-principal inquiry, or key-extraction permissions.
+The listing permission cannot be restricted to a subset of principals by an ACL pattern.
+.SH OPTIONS
+.TP
+.BR -u ", " --users
+List user principals only. Equivalent to
+.BR --type users .
+.TP
+.BR -t " " TYPE ", " --type=TYPE
+List only one category. Supported values are
+.B users
+(or
+.BR user ),
+.BR HTTP ,
+.BR cifs ,
+.BR host ,
+.BR imap ,
+.BR smtp ,
+.BR ldap ,
+and
+.BR nfs .
+Type matching is case-insensitive.
+.TP
+.BR -f " " PATTERN ", " --filter=PATTERN
+List only principals matching PATTERN. Matching is case-insensitive and uses shell-style filename pattern syntax as implemented by
+.BR fnmatch (3).
+The pattern is matched against the complete principal string.
+.TP
+.BR -r " " REALM ", " --realm=REALM
+Only display principals belonging to REALM. The realm comparison is case-insensitive.
+This option filters the returned list; the admin server and default credentials are still selected from the active Kerberos configuration and credential cache.
+.TP
+.BR -i ", " --info
+Display the default realm and KDC/admin-server entries explicitly configured for that realm, then exit.
+If no KDC is explicitly listed, MIT Kerberos may discover KDCs through DNS according to
+.B dns_lookup_kdc
+and DNS SRV records. This command reports configuration entries; it does not perform a live KDC discovery or connectivity test.
+.TP
+.BR -h ", " --help
+Display usage information and exit.
+.TP
+.B --version
+Display the version and exit.
+.TP
+.I pattern
+An optional positional filter, equivalent to
+.BR --filter .
+It cannot be specified together with
+.BR --filter .
+.SH KERBEROS CONFIGURATION
+The default realm is determined by MIT Kerberos using its normal configuration and environment rules.
+The admin server is read from the realm's
+.B admin_server
+setting in the active
+.BR krb5.conf .
+The
+.B --info
+option shows the default realm and any explicitly configured
+.B kdc
+and
+.B admin_server
+values.
+Multiple KDC entries can be configured for a realm.
+If explicit KDC entries are absent, MIT Kerberos can use DNS-based KDC discovery when enabled.
+.PP
+A valid TGT must already be present in the default credential cache.
+.B mitlist
+does not prompt for or store a password and does not require an administrative principal such as
+.BR alice/admin@EXAMPLE.COM .
+.SH EXAMPLES
+.TP
+List all principals:
+.B mitlist
+.TP
+List users only:
+.B mitlist --users
+.TP
+List HTTP service principals:
+.B mitlist --type HTTP
+.TP
+Filter principals:
+.B mitlist --filter 'www*'
+.TP
+Restrict displayed results to a realm:
+.B mitlist --realm EXAMPLE.COM
+.TP
+Show Kerberos realm and server configuration:
+.B mitlist --info
+.TP
+Show version:
+.B mitlist --version
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+An error occurred, including invalid options, unavailable Kerberos configuration, failure to obtain the admin-service ticket, or failure of the remote listing operation.
+.SH FILES
+.TP
+.I /etc/krb5.conf
+Common system-wide MIT Kerberos configuration file. The active configuration may be overridden using
+.BR KRB5_CONFIG .
+.TP
+.I kadm5.acl
+KDC-side Kerberos administration ACL file, normally located under the KDC state directory and selected by
+.B acl_file
+in
+.BR kdc.conf .
+.SH NOTES
+.B mitlist
+uses the MIT Kerberos remote administration protocol and the
+.B kadmin
+client.
+It does not read the KDC database files directly.
+The KDC administrator should grant only the
+.B l
+permission when read-only listing is the intended access.
+.SH SEE ALSO
+.BR kadmin (1),
+.BR klist (1),
+.BR kinit (1),
+.BR krb5.conf (5),
+.BR kdc.conf (5),
+.BR kadm5.acl (5)
+.SH AUTHORS
+See the project repository:
+.UR https://github.com/azwieg103/mitlist
+.UE
+.SH LICENSE
+MIT License.
