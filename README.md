@@ -55,7 +55,7 @@ mitlist --help
 mitlist --version
 ```
 
-Options and filters are case-insensitive. The optional positional pattern is equivalent to `--filter`; matching uses case-insensitive shell-style wildcards. `--info` displays the default realm plus explicitly configured KDC and admin-server entries. When KDCs are not explicitly listed, MIT Kerberos may use DNS SRV discovery depending on `dns_lookup_kdc`.
+Options and filters are case-insensitive. The optional positional pattern is equivalent to `--filter`; matching uses case-insensitive shell-style wildcards. `--info` displays the default realm, explicitly configured KDC and admin-server entries, and live DNS SRV answers for KDC UDP/TCP, master KDC UDP/TCP, admin TCP, and password UDP/TCP records. Each answer includes target, port, priority, and weight. This is a DNS lookup, not a connectivity test.
 
 ## Kerberos access: read-only users
 
