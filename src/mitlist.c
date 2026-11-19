@@ -14,7 +14,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define MITLIST_VERSION "0.1.1"
+#define MITLIST_VERSION "0.1.2"
 #define PROGRAM "mitlist"
 #define MAX_LINE 8192
 
@@ -80,12 +80,60 @@ static int compare_strings(const void *a, const void *b)
     return strcasecmp(*(char * const *)a, *(char * const *)b);
 }
 
+
+/*
+ * Resolve the configured admin_server hostname before invoking kadmin.
+ * In environments where admin_server is a DNS alias, the canonical host
+ * is the service-principal name expected by the credential cache.
+ */
+static char *canonical_admin_server(krb5_context context, const char *server)
+{
+    const char *colon = NULL;
+    size_t colons = 0, host_len;
+    char *host = NULL, *canonical_host = NULL, *result = NULL;
+    krb5_error_code code;
+
+    if (!server || !*server) return NULL;
+
+    /* Bracketed IPv6 literals and unbracketed IPv6 addresses are left intact. */
+    if (server[0] == '[') return strdup(server);
+    for (const char *p = server; *p; ++p) {
+        if (*p == ':') { colon = p; colons++; }
+    }
+    if (colons > 1) return strdup(server);
+
+    host_len = colons == 1 ? (size_t)(colon - server) : strlen(server);
+    if (host_len == 0) return NULL;
+    host = malloc(host_len + 1);
+    if (!host) return NULL;
+    memcpy(host, server, host_len);
+    host[host_len] = '\\0';
+
+    code = krb5_expand_hostname(context, host, &canonical_host);
+    free(host);
+    if (code != 0 || !canonical_host || !*canonical_host) {
+        if (canonical_host) krb5_free_string(context, canonical_host);
+        return NULL;
+    }
+
+    if (colons == 1) {
+        size_t n = strlen(canonical_host) + strlen(colon) + 1;
+        result = malloc(n);
+        if (result) snprintf(result, n, "%s%s", canonical_host, colon);
+    } else {
+        result = strdup(canonical_host);
+    }
+    krb5_free_string(context, canonical_host);
+    return result;
+}
+
 static int run_kadmin(string_list *principals)
 {
     krb5_context context = NULL;
     profile_t profile = NULL;
     char *realm = NULL;
     char *admin_server = NULL;
+    char *canonical_server = NULL;
     const char *cache_name;
     krb5_error_code code;
     long profile_code;
@@ -137,9 +185,19 @@ static int run_kadmin(string_list *principals)
     if (profile) profile_release(profile);
     krb5_free_default_realm(context, realm);
 
+    canonical_server = canonical_admin_server(context, admin_server);
+    if (!canonical_server) {
+        fprintf(stderr, PROGRAM ": cannot canonicalize configured admin_server '%s'\\n",
+                admin_server);
+        profile_release_string(admin_server);
+        krb5_free_context(context);
+        return -1;
+    }
+    profile_release_string(admin_server);
+
     if (pipe(pipefd) < 0) {
         perror(PROGRAM ": pipe");
-        profile_release_string(admin_server);
+        free(canonical_server);
         krb5_free_context(context);
         return -1;
     }
@@ -148,7 +206,7 @@ static int run_kadmin(string_list *principals)
     if (child < 0) {
         perror(PROGRAM ": fork");
         close(pipefd[0]); close(pipefd[1]);
-        profile_release_string(admin_server);
+        free(canonical_server);
         krb5_free_context(context);
         return -1;
     }
@@ -156,12 +214,12 @@ static int run_kadmin(string_list *principals)
         close(pipefd[0]);
         if (dup2(pipefd[1], STDOUT_FILENO) < 0) _exit(126);
         close(pipefd[1]);
-        execlp("kadmin", "kadmin", "-c", cache_name, "-s", admin_server,
+        execlp("kadmin", "kadmin", "-c", cache_name, "-s", canonical_server,
                "-q", "list_principals", (char *)NULL);
         fprintf(stderr, PROGRAM ": cannot execute kadmin: %s\n", strerror(errno));
         _exit(127);
     }
-    profile_release_string(admin_server);
+    free(canonical_server);
 
     close(pipefd[1]);
     stream = fdopen(pipefd[0], "r");
