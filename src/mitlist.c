@@ -258,7 +258,7 @@ static int run_kadmin(string_list *principals)
     if (ticket_realm) krb5_free_default_realm(context, ticket_realm);
     if (code != 0) {
         const char *message = krb5_get_error_message(context, code);
-        fprintf(stderr, PROGRAM ": cannot obtain the admin-server service ticket: %s\\n",
+        fprintf(stderr, PROGRAM ": cannot obtain the admin-server service ticket: %s\n",
                 message ? message : "Kerberos error");
         if (message) krb5_free_error_message(context, message);
         free(canonical_server);
