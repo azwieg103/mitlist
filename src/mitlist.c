@@ -104,10 +104,45 @@ static int run_kadmin(string_list *principals)
     }
     cache_name = krb5_cc_default_name(context);
     if (!cache_name || !*cache_name) {
-        fprintf(stderr, PROGRAM ": no default Kerberos credential cache is configured\n");
+        fprintf(stderr, PROGRAM ": no default Kerberos credential cache is configured\\n");
         krb5_free_context(context);
         return -1;
     }
+
+    /* Obtain kadmin/admin from the user's existing TGT and cache it. */
+    {
+        krb5_ccache cache = NULL;
+        krb5_principal client = NULL, server = NULL;
+        krb5_creds request, *credentials = NULL;
+        krb5_error_code code;
+        memset(&request, 0, sizeof(request));
+        code = krb5_cc_resolve(context, cache_name, &cache);
+        if (code == 0) code = krb5_cc_get_principal(context, cache, &client);
+        if (code == 0) {
+            krb5_data realm = krb5_princ_realm(context, client);
+            code = krb5_build_principal(context, &server, realm.length,
+                                        realm.data, "kadmin", "admin", NULL);
+        }
+        if (code == 0) {
+            request.client = client;
+            request.server = server;
+            code = krb5_get_credentials(context, 0, cache, &request, &credentials);
+        }
+        if (code == 0) code = krb5_cc_store_cred(context, cache, credentials);
+        if (credentials) krb5_free_creds(context, credentials);
+        if (server) krb5_free_principal(context, server);
+        if (client) krb5_free_principal(context, client);
+        if (cache) krb5_cc_close(context, cache);
+        if (code != 0) {
+            const char *message = krb5_get_error_message(context, code);
+            fprintf(stderr, PROGRAM ": cannot obtain kadmin/admin using the current ticket cache: %s\\n",
+                    message ? message : "Kerberos error");
+            if (message) krb5_free_error_message(context, message);
+            krb5_free_context(context);
+            return -1;
+        }
+    }
+
     if (pipe(pipefd) < 0) {
         perror(PROGRAM ": pipe");
         krb5_free_context(context);
