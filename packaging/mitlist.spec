@@ -9,7 +9,6 @@ BuildRequires:  gcc
 BuildRequires:  make
 BuildRequires:  krb5-devel
 Requires:       krb5-workstation
-BuildRequires:  gzip
 
 %description
 mitlist is a read-only command-line utility that lists MIT Kerberos
@@ -30,7 +29,7 @@ rm -rf %{buildroot}
 %{_mandir}/man1/mitlist.1*
 
 %changelog
-* Thu Nov 19 2026 Package Maintainer <packages@example.invalid> - 0.1.4-1.el10
+* Thu Nov 19 2026 Andrew Zwieg <andyzwieg@gmail.com> - 0.1.4-ZWIEGNET.2.el10
 - Add --info server discovery output, clean command output, and install the man page.
 
 * Thu Nov 19 2026 ZWIEGNET <packages@zwiegnet.com> - 0.1.3-ZWIEGNET.1.el10
