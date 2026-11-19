@@ -14,7 +14,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define MITLIST_VERSION "0.1.2"
+#define MITLIST_VERSION "0.1.3"
 #define PROGRAM "mitlist"
 #define MAX_LINE 8192
 
@@ -127,6 +127,62 @@ static char *canonical_admin_server(krb5_context context, const char *server)
     return result;
 }
 
+
+/*
+ * kadmin expects the admin service ticket to already be in the cache in this
+ * environment. Acquire kadmin/<canonical-host> here, just as kvno does,
+ * before starting the kadmin client.
+ */
+static krb5_error_code acquire_admin_ticket(krb5_context context,
+                                             const char *server,
+                                             const char *realm)
+{
+    const char *host_start = server;
+    const char *host_end = NULL;
+    const char *colon = NULL;
+    size_t colon_count = 0, host_len;
+    char *host = NULL;
+    krb5_principal principal = NULL;
+    krb5_ccache cache = NULL;
+    krb5_creds *credentials = NULL;
+    krb5_error_code code;
+
+    if (server[0] == '[') {
+        host_start = server + 1;
+        host_end = strchr(host_start, ']');
+        if (!host_end) return EINVAL;
+    } else {
+        for (const char *p = server; *p; ++p) {
+            if (*p == ':') { colon = p; colon_count++; }
+        }
+        if (colon_count == 1) host_end = colon;
+    }
+    if (!host_end) host_end = server + strlen(server);
+    host_len = (size_t)(host_end - host_start);
+    if (host_len == 0) return EINVAL;
+
+    host = malloc(host_len + 1);
+    if (!host) return ENOMEM;
+    memcpy(host, host_start, host_len);
+    host[host_len] = '\0';
+
+    code = krb5_build_principal(context, &principal, (unsigned int)strlen(realm),
+                                realm, "kadmin", host, (char *)NULL);
+    free(host);
+    if (code != 0) goto cleanup;
+
+    code = krb5_cc_default(context, &cache);
+    if (code != 0) goto cleanup;
+
+    code = krb5_get_credentials(context, 0, cache, principal, &credentials);
+
+cleanup:
+    if (credentials) krb5_free_creds(context, credentials);
+    if (cache) krb5_cc_close(context, cache);
+    if (principal) krb5_free_principal(context, principal);
+    return code;
+}
+
 static int run_kadmin(string_list *principals)
 {
     krb5_context context = NULL;
@@ -134,6 +190,7 @@ static int run_kadmin(string_list *principals)
     char *realm = NULL;
     char *admin_server = NULL;
     char *canonical_server = NULL;
+    char *ticket_realm = NULL;
     const char *cache_name;
     krb5_error_code code;
     long profile_code;
@@ -194,6 +251,20 @@ static int run_kadmin(string_list *principals)
         return -1;
     }
     profile_release_string(admin_server);
+
+    code = krb5_get_default_realm(context, &ticket_realm);
+    if (code == 0)
+        code = acquire_admin_ticket(context, canonical_server, ticket_realm);
+    if (ticket_realm) krb5_free_default_realm(context, ticket_realm);
+    if (code != 0) {
+        const char *message = krb5_get_error_message(context, code);
+        fprintf(stderr, PROGRAM ": cannot obtain the admin-server service ticket: %s\\n",
+                message ? message : "Kerberos error");
+        if (message) krb5_free_error_message(context, message);
+        free(canonical_server);
+        krb5_free_context(context);
+        return -1;
+    }
 
     if (pipe(pipefd) < 0) {
         perror(PROGRAM ": pipe");
