@@ -1,0 +1,127 @@
+name: Build and Publish AlmaLinux 10 RPM
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "Makefile"
+      - "packaging/**"
+      - "scripts/**"
+      - ".github/workflows/build-rpm.yml"
+
+concurrency:
+  group: mitlist-rpm-build
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: almalinux:10
+    permissions:
+      contents: read
+    outputs:
+      rpm_version: ${{ steps.meta.outputs.version }}
+    steps:
+      - name: Install build requirements
+        run: |
+          dnf -y install gcc make krb5-devel krb5-workstation rpm-build rpmdevtools tar gzip findutils
+          dnf clean all
+
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Select next ZWIEGNET rebuild number
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, urllib.request
+          version = re.search(r'MITLIST_VERSION "([^"]+)"', open("src/mitlist.c", encoding="utf-8").read()).group(1)
+          prefix = f"mitlist-{version}-ZWIEGNET."
+          maximum = 0
+          page = 1
+          while True:
+              url = f"https://api.github.com/repos/${{ github.repository }}/releases?per_page=100&page={page}"
+              request = urllib.request.Request(url, headers={
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
+                  "X-GitHub-Api-Version": "2022-11-28",
+              })
+              with urllib.request.urlopen(request) as response:
+                  releases = json.load(response)
+              for release in releases:
+                  tag = release.get("tag_name", "")
+                  if tag.startswith(prefix):
+                      match = re.fullmatch(r"([1-9][0-9]*)\.el10", tag[len(prefix):])
+                      if match:
+                          maximum = max(maximum, int(match.group(1)))
+              if len(releases) < 100:
+                  break
+              page += 1
+          value = f"ZWIEGNET.{maximum + 1}.el10"
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"release={value}\n")
+          print(f"RPM release: {version}-{value}")
+          PY
+
+      - name: Build RPM
+        run: bash scripts/build-rpm.sh
+        env:
+          RPM_RELEASE: ${{ steps.release.outputs.release }}
+
+      - name: Determine RPM metadata
+        id: meta
+        run: |
+          rpm_file=$(find dist -maxdepth 1 -type f -name 'mitlist-*.el10.x86_64.rpm' ! -name '*debuginfo*' | head -n1)
+          test -n "$rpm_file"
+          version=$(rpm -qp --qf '%{VERSION}-%{RELEASE}' "$rpm_file")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Upload RPM artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mitlist-almalinux-10-x86_64
+          path: dist/*.rpm
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download RPM artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: mitlist-almalinux-10-x86_64
+          path: dist
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          RPM_VERSION: ${{ needs.build.outputs.rpm_version }}
+        run: |
+          set -euo pipefail
+          tag="mitlist-$RPM_VERSION"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; refusing to overwrite."
+            exit 1
+          fi
+          gh release create "$tag" dist/*.rpm \
+            --target "$GITHUB_SHA" \
+            --title "mitlist $RPM_VERSION (Enterprise Linux 10)" \
+            --notes "mitlist RPM and source RPM for Enterprise Linux 10 x86_64. Built on AlmaLinux 10. Uses the active Kerberos credential cache and requires the Kerberos list ACL. Supplied as-is, without warranty or support." \
+            --latest
