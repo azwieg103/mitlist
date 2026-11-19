@@ -138,7 +138,7 @@ static char *canonical_admin_server(krb5_context context, const char *server)
  */
 static krb5_error_code acquire_admin_ticket(krb5_context context,
                                              const char *server,
-                                             const char *realm)
+                                             const char *realm, int force_refresh)
 {
     const char *host_start = server;
     const char *host_end = NULL;
@@ -181,6 +181,12 @@ static krb5_error_code acquire_admin_ticket(krb5_context context,
     code = krb5_cc_get_principal(context, cache, &request.client);
     if (code != 0) goto cleanup;
     request.server = principal;
+    if (force_refresh) {
+        code = krb5_cc_remove_cred(context, cache,
+                                   KRB5_TC_MATCH_CLIENT | KRB5_TC_MATCH_SERVER,
+                                   &request);
+        if (code != 0 && code != KRB5_CC_NOTFOUND) goto cleanup;
+    }
     code = krb5_get_credentials(context, 0, cache, &request, &credentials);
 
 cleanup:
@@ -285,6 +291,39 @@ static int show_info(void)
     return EXIT_SUCCESS;
 }
 
+static int execute_kadmin(const char *cache_name, const char *server, string_list *principals)
+{
+    int attempt;
+    if (pipe(pipefd) < 0) { perror(PROGRAM ": pipe"); return -1; }
+    child = fork();
+    if (child < 0) { perror(PROGRAM ": fork"); close(pipefd[0]); close(pipefd[1]); return -1; }
+    if (child == 0) {
+        close(pipefd[0]);
+        if (dup2(pipefd[1], STDOUT_FILENO) < 0) _exit(126);
+        if (dup2(STDOUT_FILENO, STDERR_FILENO) < 0) _exit(126);
+        close(pipefd[1]);
+        execlp("kadmin", "kadmin", "-c", cache_name, "-s", server, "-q", "list_principals", (char *)NULL);
+        fprintf(stderr, PROGRAM ": cannot execute kadmin: %s\n", strerror(errno));
+        _exit(127);
+    }
+    close(pipefd[1]);
+    stream = fdopen(pipefd[0], "r");
+    if (!stream) { perror(PROGRAM ": fdopen"); close(pipefd[0]); waitpid(child, &status, 0); return -1; }
+    while (fgets(line, sizeof(line), stream)) {
+        size_t n = strcspn(line, "\r\n");
+        line[n] = '\0';
+        if (!n) continue;
+        if (strchr(line, '@') && strpbrk(line, " \t") == NULL) {
+            if (list_add(principals, line) < 0) { fprintf(stderr, PROGRAM ": out of memory\n"); fclose(stream); waitpid(child, &status, 0); return -1; }
+        } else if (strncmp(line, "Authenticating as principal ", 28) != 0) {
+            fprintf(stderr, PROGRAM ": %s\n", line);
+        }
+    }
+    fclose(stream);
+    if (waitpid(child, &status, 0) < 0) { perror(PROGRAM ": waitpid"); return -1; }
+    return WIFEXITED(status) && WEXITSTATUS(status) == 0 ? 0 : -1;
+}
+
 static int run_kadmin(string_list *principals)
 {
     krb5_context context = NULL;
@@ -355,81 +394,37 @@ static int run_kadmin(string_list *principals)
     profile_release_string(admin_server);
 
     code = krb5_get_default_realm(context, &ticket_realm);
-    if (code == 0)
-        code = acquire_admin_ticket(context, canonical_server, ticket_realm);
-    if (ticket_realm) krb5_free_default_realm(context, ticket_realm);
     if (code != 0) {
         const char *message = krb5_get_error_message(context, code);
-        fprintf(stderr, PROGRAM ": cannot obtain the admin-server service ticket: %s\n",
-                message ? message : "Kerberos error");
+        fprintf(stderr, PROGRAM ": cannot determine ticket realm: %s\n", message ? message : "Kerberos error");
         if (message) krb5_free_error_message(context, message);
         free(canonical_server);
         krb5_free_context(context);
         return -1;
     }
-
-    if (pipe(pipefd) < 0) {
-        perror(PROGRAM ": pipe");
-        free(canonical_server);
-        krb5_free_context(context);
-        return -1;
-    }
-
-    child = fork();
-    if (child < 0) {
-        perror(PROGRAM ": fork");
-        close(pipefd[0]); close(pipefd[1]);
-        free(canonical_server);
-        krb5_free_context(context);
-        return -1;
-    }
-    if (child == 0) {
-        close(pipefd[0]);
-        if (dup2(pipefd[1], STDOUT_FILENO) < 0) _exit(126);
-        if (dup2(STDOUT_FILENO, STDERR_FILENO) < 0) _exit(126);
-        close(pipefd[1]);
-        execlp("kadmin", "kadmin", "-c", cache_name, "-s", canonical_server,
-               "-q", "list_principals", (char *)NULL);
-        fprintf(stderr, PROGRAM ": cannot execute kadmin: %s\n", strerror(errno));
-        _exit(127);
-    }
-    free(canonical_server);
-
-    close(pipefd[1]);
-    stream = fdopen(pipefd[0], "r");
-    if (!stream) {
-        perror(PROGRAM ": fdopen");
-        close(pipefd[0]);
-        waitpid(child, &status, 0);
-        krb5_free_context(context);
-        return -1;
-    }
-
-    while (fgets(line, sizeof(line), stream)) {
-        size_t n = strcspn(line, "\r\n");
-        line[n] = '\0';
-        if (n == 0 || !strchr(line, '@') || strpbrk(line, " \t") != NULL) continue;
-        if (list_add(principals, line) < 0) {
-            fprintf(stderr, PROGRAM ": out of memory\n");
-            fclose(stream);
-            waitpid(child, &status, 0);
-            krb5_free_context(context);
-            return -1;
+    for (attempt = 0; attempt < 2; ++attempt) {
+        code = acquire_admin_ticket(context, canonical_server, ticket_realm, attempt == 1);
+        if (code != 0) {
+            const char *message = krb5_get_error_message(context, code);
+            fprintf(stderr, PROGRAM ": %s admin-server service ticket: %s\n", attempt ? "cannot refresh" : "cannot obtain", message ? message : "Kerberos error");
+            if (message) krb5_free_error_message(context, message);
+            break;
         }
+        if (execute_kadmin(cache_name, canonical_server, principals) == 0) {
+            krb5_free_default_realm(context, ticket_realm);
+            free(canonical_server);
+            krb5_free_context(context);
+            return 0;
+        }
+        list_free(principals);
+        memset(principals, 0, sizeof(*principals));
+        if (attempt == 0) fprintf(stderr, PROGRAM ": kadmin rejected the cached service ticket; refreshing it and retrying once\n");
     }
-    fclose(stream);
-    if (waitpid(child, &status, 0) < 0) {
-        perror(PROGRAM ": waitpid");
-        krb5_free_context(context);
-        return -1;
-    }
+    fprintf(stderr, PROGRAM ": kadmin failed after one service-ticket retry. Check kadmind access, the Kerberos 'list' ACL, and admin_server configuration.\n");
+    krb5_free_default_realm(context, ticket_realm);
+    free(canonical_server);
     krb5_free_context(context);
-    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-        fprintf(stderr, PROGRAM ": kadmin failed. Confirm kadmind access, the "
-                "Kerberos 'list' ACL, and the realm's admin_server configuration.\n");
-        return -1;
-    }
-    return 0;
+    return -1;
 }
 
 static int principal_category(const char *principal)
