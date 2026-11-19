@@ -30,7 +30,7 @@ jobs:
     steps:
       - name: Install build requirements
         run: |
-          dnf -y install gcc make krb5-devel krb5-workstation rpm-build rpmdevtools tar gzip findutils
+          dnf -y install python3 gcc make krb5-devel krb5-workstation rpm-build rpmdevtools tar gzip findutils
           dnf clean all
 
       - name: Check out repository
