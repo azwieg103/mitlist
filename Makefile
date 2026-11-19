@@ -4,7 +4,7 @@ MANDIR ?= $(PREFIX)/share/man
 CC ?= cc
 CFLAGS ?= -O2 -g
 CPPFLAGS += $(shell krb5-config --cflags 2>/dev/null)
-KRB5_LIBS := $(shell krb5-config --libs 2>/dev/null)
+KRB5_LIBS := $(shell krb5-config --libs 2>/dev/null) -lresolv
 
 .PHONY: all clean install
 all: mitlist
