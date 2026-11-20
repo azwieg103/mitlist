@@ -458,11 +458,13 @@ static int run_kadmin(string_list *principals)
     /* Refresh only kadmin/<host> before the first request. This removes a stale
      * service ticket from persistent caches while preserving the user's TGT
      * and every unrelated credential. */
-    for (attempt = 0; attempt < 2; ++attempt) {
+    for (attempt = 0; attempt < 5; ++attempt) {
         code = acquire_admin_ticket(context, canonical_server, ticket_realm, 1);
         if (code != 0) {
             const char *message = krb5_get_error_message(context, code);
-            fprintf(stderr, PROGRAM ": %s admin-server service ticket: %s\n", attempt ? "cannot refresh" : "cannot obtain", message ? message : "Kerberos error");
+            fprintf(stderr, PROGRAM ": attempt %d/5: %s admin-server service ticket: %s\n",
+                    attempt + 1, attempt ? "cannot refresh" : "cannot obtain",
+                    message ? message : "Kerberos error");
             if (message) krb5_free_error_message(context, message);
             break;
         }
@@ -475,9 +477,11 @@ static int run_kadmin(string_list *principals)
         }
         list_free(principals);
         memset(principals, 0, sizeof(*principals));
-        if (attempt == 0) fprintf(stderr, PROGRAM ": kadmin command failed; refreshing the service ticket and retrying once\n");
+        if (attempt < 4)
+            fprintf(stderr, PROGRAM ": kadmin attempt %d/5 failed; refreshing the service ticket and retrying immediately\n",
+                    attempt + 1);
     }
-    fprintf(stderr, PROGRAM ": kadmin command failed after service-ticket refresh and retry. Check the kadmin diagnostic above, kadmind access, the Kerberos 'list' ACL, and admin_server configuration.\n");
+    fprintf(stderr, PROGRAM ": kadmin failed after up to 5 attempts. Check the kadmin diagnostic above, kadmind access, the Kerberos 'list' ACL, and admin_server configuration.\n");
     krb5_free_default_realm(context, ticket_realm);
     free(canonical_server);
     free(authenticated_principal);
