@@ -316,7 +316,7 @@ static int show_info(void)
     return EXIT_SUCCESS;
 }
 
-static int execute_kadmin(const char *cache_name, const char *server, string_list *principals)
+static int execute_kadmin(const char *cache_name, const char *principal, const char *server, string_list *principals)
 {
     int pipefd[2], status;
     pid_t child;
@@ -330,7 +330,7 @@ static int execute_kadmin(const char *cache_name, const char *server, string_lis
         if (dup2(pipefd[1], STDOUT_FILENO) < 0) _exit(126);
         if (dup2(STDOUT_FILENO, STDERR_FILENO) < 0) _exit(126);
         close(pipefd[1]);
-        execlp("kadmin", "kadmin", "-c", cache_name, "-s", server, "-q", "list_principals", (char *)NULL);
+        execlp("kadmin", "kadmin", "-c", cache_name, "-p", principal, "-s", server, "-q", "list_principals", (char *)NULL);
         fprintf(stderr, PROGRAM ": cannot execute kadmin: %s\n", strerror(errno));
         _exit(127);
     }
@@ -362,6 +362,10 @@ static int run_kadmin(string_list *principals)
     char *canonical_server = NULL;
     char *ticket_realm = NULL;
     const char *cache_name;
+    char *authenticated_principal = NULL;
+    krb5_ccache cache = NULL;
+    krb5_principal cache_principal = NULL;
+    char *unparsed_principal = NULL;
     krb5_error_code code;
     long profile_code;
     int attempt;
@@ -374,6 +378,29 @@ static int run_kadmin(string_list *principals)
     cache_name = krb5_cc_default_name(context);
     if (!cache_name || !*cache_name) {
         fprintf(stderr, PROGRAM ": no default Kerberos credential cache is configured\n");
+        free(authenticated_principal);
+        krb5_free_context(context);
+        return -1;
+    }
+
+    code = krb5_cc_default(context, &cache);
+    if (code == 0) code = krb5_cc_get_principal(context, cache, &cache_principal);
+    if (code == 0) code = krb5_unparse_name(context, cache_principal, &unparsed_principal);
+    if (cache_principal) krb5_free_principal(context, cache_principal);
+    if (cache) krb5_cc_close(context, cache);
+    if (code != 0 || !unparsed_principal || !*unparsed_principal) {
+        const char *message = krb5_get_error_message(context, code);
+        fprintf(stderr, PROGRAM ": cannot determine the default credential-cache principal: %s\n",
+                message ? message : "Kerberos error");
+        if (message) krb5_free_error_message(context, message);
+        if (unparsed_principal) krb5_free_unparsed_name(context, unparsed_principal);
+        krb5_free_context(context);
+        return -1;
+    }
+    authenticated_principal = strdup(unparsed_principal);
+    krb5_free_unparsed_name(context, unparsed_principal);
+    if (!authenticated_principal) {
+        fprintf(stderr, PROGRAM ": out of memory\n");
         krb5_free_context(context);
         return -1;
     }
@@ -439,9 +466,10 @@ static int run_kadmin(string_list *principals)
             if (message) krb5_free_error_message(context, message);
             break;
         }
-        if (execute_kadmin(cache_name, canonical_server, principals) == 0) {
+        if (execute_kadmin(cache_name, authenticated_principal, canonical_server, principals) == 0) {
             krb5_free_default_realm(context, ticket_realm);
             free(canonical_server);
+            free(authenticated_principal);
             krb5_free_context(context);
             return 0;
         }
@@ -452,6 +480,7 @@ static int run_kadmin(string_list *principals)
     fprintf(stderr, PROGRAM ": kadmin command failed after service-ticket refresh and retry. Check the kadmin diagnostic above, kadmind access, the Kerberos 'list' ACL, and admin_server configuration.\n");
     krb5_free_default_realm(context, ticket_realm);
     free(canonical_server);
+    free(authenticated_principal);
     krb5_free_context(context);
     return -1;
 }
