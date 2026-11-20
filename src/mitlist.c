@@ -466,7 +466,7 @@ static int run_kadmin(string_list *principals)
                     attempt + 1, attempt ? "cannot refresh" : "cannot obtain",
                     message ? message : "Kerberos error");
             if (message) krb5_free_error_message(context, message);
-            break;
+            continue;
         }
         if (execute_kadmin(cache_name, authenticated_principal, canonical_server, principals) == 0) {
             krb5_free_default_realm(context, ticket_realm);
