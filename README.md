@@ -50,6 +50,7 @@ mitlist -r EXAMPLE.COM
 mitlist --info
 
 # Help and version
+mitlist -h
 mitlist --help
 mitlist --version
 ```
@@ -59,6 +60,15 @@ Options and filters are case-insensitive. The optional positional pattern is equ
 ## Kerberos access: read-only users
 
 mitlist uses the MIT Kerberos remote administration protocol to list principal names. It does **not** read the KDC database directly and does not add, modify, delete, or extract keys.
+
+### Retry behavior
+
+The remote `kadmin` listing operation is attempted up to **five times**. Attempts run in rapid succession with no intentional delay. Before each attempt, mitlist refreshes the server-specific `kadmin` service ticket and then retries the listing operation.
+
+A failed service-ticket refresh or failed `kadmin` operation consumes that attempt; the utility continues until a listing succeeds or all five attempts have been used. Refreshing the service ticket does not destroy the TGT or unrelated credentials in the cache, and mitlist does not run `kdestroy` or prompt for a password.
+
+When an attempt fails, mitlist reports the attempt number and that it is retrying. If all attempts fail, it prints a final diagnostic directing the administrator to check the kadmin error, kadmind access, the `list` ACL, and the admin-server configuration. Retries help recover from intermittent failures; they do not replace correct Kerberos server, network, or ACL configuration.
+
 
 **A normal user does not need an administrative principal such as `andrew/admin@REALM`.** mitlist uses the default credential cache and reads the realm's `admin_server` setting from the active Kerberos configuration (`krb5.conf`, including configuration selected through `KRB5_CONFIG`). It passes that server to `kadmin` and lets MIT Kerberos use the credentials already in the cache; it does not force an `/admin` identity or prompt for a password. The administrator can grant the ordinary principal only the `list` ACL permission.
 
@@ -120,7 +130,7 @@ If the command fails, check the exact principal shown by `klist`, the ACL entry 
 
 The primary packaging target is **AlmaLinux 10 x86_64**. RPM releases use an automated, repeatable packaging workflow:
 
-- Build in an AlmaLinux 10.
+- Build on AlmaLinux 10.
 - Produce installable binary RPMs and a source RPM.
 - Run build and command-line validation checks before publishing.
 - Publish successful packages as GitHub Release assets.
