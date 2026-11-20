@@ -1,6 +1,6 @@
 Name:           mitlist
 Version:        0.1.6
-Release:        %{?rpm_release}%{!?rpm_release:ZWIEGNET.1.el10}
+Release:        %{?rpm_release}%{!?rpm_release:ZWIEGNET.7.el10}
 Summary:        List MIT Kerberos principals by principal type
 License:        MIT
 URL:            https://github.com/azwieg103/mitlist
@@ -29,6 +29,9 @@ rm -rf %{buildroot}
 %{_mandir}/man1/mitlist.1*
 
 %changelog
+* Fri Nov 20 2026 Andrew Zwieg <andyzwieg@gmail.com> - 0.1.6-ZWIEGNET.7.el10
+- Pass the credential cache's actual default principal to kadmin with -p, avoiding its implicit /admin principal selection.
+
 * Thu Nov 19 2026 Andrew Zwieg <andyzwieg@gmail.com> - 0.1.6-ZWIEGNET.1.el10
 - Recognize common database, messaging, application, storage, and infrastructure service principal prefixes; omit empty categories.
 
