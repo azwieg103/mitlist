@@ -23,7 +23,7 @@
 typedef struct { const char *name; const char *service; } category;
 static const category categories[] = {
     {"Users", NULL},
-    {"HTTP", "http"}, {"CIFS", "cifs"}, {"Host", "host"},
+    {"HTTP", "http"}, {"CIFS", "cifs"}, {"Host", "host"}, {"TERMSRV", "termsrv"},
     {"IMAP", "imap"}, {"SMTP", "smtp"}, {"LDAP", "ldap"}, {"NFS", "nfs"},
     {"MySQL", "mysql"}, {"PostgreSQL", "postgres"},
     {"Oracle", "oracle"}, {"SQL Server", "mssqlsvc"}, {"IBM Db2", "db2"},
@@ -54,7 +54,7 @@ static void usage(FILE *out)
         "Options:\n"
         "  -u, --users             List user principals only\n"
         "  -t, --type TYPE         List one type; supported values (case-insensitive):\n"
-        "                            users, HTTP, cifs, host, imap, smtp, ldap, nfs,\n"
+        "                            users, HTTP, cifs, host, termsrv, imap, smtp, ldap, nfs,\n"
         "                            mysql, postgres, oracle, mssqlsvc, db2, hana,\n"
         "                            informix, mongodb, cassandra, redis, xmpp,\n"
         "                            kafka, zookeeper, rabbitmq, activemq, tomcat,\n"
