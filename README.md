@@ -19,6 +19,7 @@ The project is hosted at [github.com/azwieg103/mitlist](https://github.com/azwie
 |---|---|
 | Users | `username@REALM` |
 | HTTP, CIFS, Host, IMAP, SMTP, LDAP, NFS | `HTTP/`, `cifs/`, `host/`, `imap/`, `smtp/`, `ldap/`, `nfs/` |
+| TERMSRV (Remote Desktop Services) | `TERMSRV/hostname@REALM`, `TERMSRV/hostname.example.com@REALM` |
 | MySQL, PostgreSQL, Oracle, SQL Server, IBM Db2, SAP HANA, Informix, MongoDB, Cassandra, Redis | `mysql/`, `postgres/`, `oracle/`, `MSSQLSvc/`, `db2/`, `hana/`, `informix/`, `mongodb/`, `cassandra/`, `redis/` |
 | XMPP, Kafka, ZooKeeper, RabbitMQ, ActiveMQ | `xmpp/`, `kafka/`, `zookeeper/`, `rabbitmq/`, `activemq/` |
 | Tomcat, JBoss/WildFly, WebSphere, WebLogic, Jenkins, Elasticsearch, Solr, Docker | `tomcat/`, `jboss/`, `was/`, `weblogic/`, `jenkins/`, `elasticsearch/`, `solr/`, `docker/` |
@@ -39,6 +40,7 @@ mitlist -u
 # List a service class (case-insensitive)
 mitlist -t HTTP
 mitlist -t cifs
+mitlist -t TERMSRV
 
 # Filter principal names
 mitlist -f 'www*'
